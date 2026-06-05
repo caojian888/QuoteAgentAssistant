@@ -14,7 +14,6 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
@@ -54,12 +53,11 @@ from .feishu_auth import (
 )
 from .model_config import build_model_config
 from .qc import build_prompt_with_vision_context, extract_vision_context, generate_once, review_once
+from .runtime_config import PROJECT_ROOT, load_runtime_env, runtime_data_dir
 
 
-load_dotenv()
-
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DATA_DIR = Path(os.getenv("QUOTE_DATA_DIR", PROJECT_ROOT / "data")).resolve()
+load_runtime_env()
+DATA_DIR = runtime_data_dir()
 JOBS_DIR = DATA_DIR / "jobs"
 STATIC_DIR = PROJECT_ROOT / "static"
 FEISHU_STATE_COOKIE_NAME = "quote_feishu_oauth_state"

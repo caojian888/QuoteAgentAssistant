@@ -9,10 +9,9 @@ from inspect import isawaitable
 from datetime import datetime
 from pathlib import Path
 
-from dotenv import load_dotenv
-
 from .model_config import ModelConfig, build_model_config
 from .qc import run_with_quality_loop
+from .runtime_config import load_runtime_env, runtime_path
 
 
 DEFAULT_WATCH_PROMPT = (
@@ -109,8 +108,8 @@ def output_name_for(path: Path) -> str:
 
 
 async def watch_command(args: argparse.Namespace) -> None:
-    inbox = Path(args.inbox).resolve()
-    outbox = Path(args.outbox).resolve()
+    inbox = runtime_path(args.inbox, env_name="QUOTE_INBOX_DIR", default="inbox")
+    outbox = runtime_path(args.outbox, env_name="QUOTE_OUTBOX_DIR", default="outbox")
     inbox.mkdir(parents=True, exist_ok=True)
     outbox.mkdir(parents=True, exist_ok=True)
 
@@ -189,8 +188,8 @@ def build_parser() -> argparse.ArgumentParser:
     quote.set_defaults(func=quote_command)
 
     watch = subparsers.add_parser("watch", help="监听 inbox 文件夹，自动生成 outbox 报告")
-    watch.add_argument("--inbox", default="inbox", help="待报价图纸目录")
-    watch.add_argument("--outbox", default="outbox", help="报价报告输出目录")
+    watch.add_argument("--inbox", default=None, help="待报价图纸目录；默认读取 QUOTE_INBOX_DIR 或项目根目录 inbox")
+    watch.add_argument("--outbox", default=None, help="报价报告输出目录；默认读取 QUOTE_OUTBOX_DIR 或项目根目录 outbox")
     watch.add_argument("--interval", type=float, default=5.0, help="轮询间隔秒数")
     watch.add_argument("--prompt", default=DEFAULT_WATCH_PROMPT, help="自动报价默认提示词")
     watch.add_argument("--max-review-rounds", type=int, default=2, help="自动审核不通过后的最多重跑轮数")
@@ -214,7 +213,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
-    load_dotenv()
+    load_runtime_env()
     parser = build_parser()
     args = parser.parse_args()
     try:
