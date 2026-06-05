@@ -785,8 +785,42 @@ body::before {
 .agent-figure .agent-torso,
 .agent-figure .agent-panel,
 .agent-figure .agent-arm,
-.agent-figure .agent-leg {
+.agent-figure .agent-leg,
+.agent-figure .agent-name-tag {
   position: absolute;
+}
+
+.agent-name-tag {
+  left: 50%;
+  top: -20px;
+  z-index: 6;
+  max-width: 118px;
+  min-height: 20px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(255, 255, 255, 0.74);
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: rgba(18, 26, 46, 0.86);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  overflow: hidden;
+  pointer-events: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-shadow: 0 10px 20px rgba(18, 26, 46, 0.18);
+}
+
+.agent-figure.active .agent-name-tag {
+  background: var(--agent-accent, #3a97ff);
+  box-shadow: 0 0 0 5px rgba(58, 151, 255, 0.14), 0 12px 22px rgba(18, 26, 46, 0.2);
+}
+
+.agent-figure.standing .agent-name-tag {
+  top: -18px;
+  max-width: 126px;
 }
 
 .agent-head {

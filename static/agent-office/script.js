@@ -545,6 +545,7 @@ function renderFigure(agentId, variant) {
       aria-label="查看 ${escapeHtml(agent.name)}"
       style="--agent-accent:${agent.accent};"
     >
+      <span class="agent-name-tag">${escapeHtml(agent.name)}</span>
       <span class="agent-head"></span>
       <span class="agent-arm left"></span>
       <span class="agent-arm right"></span>
@@ -570,11 +571,12 @@ function renderDeskGrid() {
     const monitorTone = occupant ? occupant.monitor : "";
     const stationClass = occupant ? "occupied" : "empty";
     const activeClass = occupant && station.occupant === app.activeAgentId ? "active" : "";
+    const stationLabel = occupant ? occupant.name : station.label;
     const caption = occupant ? occupant.role : station.label;
 
     return `
       <article class="desk-slot ${stationClass} ${activeClass}">
-        <span class="desk-label">${escapeHtml(station.label)}</span>
+        <span class="desk-label">${escapeHtml(stationLabel)}</span>
         <div class="desk-set">
           <span class="desk-shadow"></span>
           <span class="monitor ${monitorTone}"></span>
