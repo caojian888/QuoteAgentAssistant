@@ -1,7 +1,7 @@
 <<<<<<< HEAD
 # Quote Agent Assistant
 
-这是一个“独立/自动报价助手”MVP，把 `D:\cost-model-skills` 里的 6 个 Markdown skill 包装成一个多 Agent 系统。
+这是一个“独立/自动报价助手”MVP，把 `/cost-model-skills` 里的 6 个 Markdown skill 包装成一个多 Agent 系统。
 
 它现在同时支持：
 
@@ -25,10 +25,9 @@
 
 ## 安装
 
-```powershell
-cd C:\Users\YWsensei\Documents\Codex\2026-06-03\agent-2\outputs\quote-agent-assistant
+```
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+./.venv/Scripts/Activate.ps1
 pip install -r requirements.txt
 Copy-Item .env.example .env
 ```
@@ -93,13 +92,13 @@ QUOTE_REVIEW_MODEL=gpt-5.5
 
 命令行也可以临时覆盖：
 
-```powershell
-python -m quote_assistant --vision-model gpt-5.5 --work-model mimo-tokenplan-model-name --review-model gpt-5.5 quote "识别图纸并报价" --file C:\path\to\drawing.png
+```
+python -m quote_assistant --vision-model gpt-5.5 --work-model mimo-tokenplan-model-name --review-model gpt-5.5 quote "识别图纸并报价" --file /path/to/drawing.png
 ```
 
 兼容旧参数：
 
-```powershell
+```
 python -m quote_assistant --model gpt-4.1-mini quote "识别图纸并报价"
 ```
 
@@ -109,39 +108,39 @@ python -m quote_assistant --model gpt-4.1-mini quote "识别图纸并报价"
 
 文字参数：
 
-```powershell
+```
 python -m quote_assistant quote "帮我计算 T2 铜排 100x10x300mm 成本，铜含税单价 78 元/kg。"
 ```
 
 图纸/PDF：
 
-```powershell
-python -m quote_assistant quote "识别图纸品类并生成报价报告。铜含税单价 78 元/kg。" --file C:\path\to\drawing.pdf
+```
+python -m quote_assistant quote "识别图纸品类并生成报价报告。铜含税单价 78 元/kg。" --file /path/to/drawing.pdf
 ```
 
 图片：
 
-```powershell
-python -m quote_assistant quote "请根据图纸做成本估算，缺少参数列待确认。" --file C:\path\to\drawing.png
+```
+python -m quote_assistant quote "请根据图纸做成本估算，缺少参数列待确认。" --file /path/to/drawing.png
 ```
 
 默认会自动审核。如果审核不通过，系统会带着审核意见重新识别/重算，默认最多重跑 2 轮：
 
-```powershell
-python -m quote_assistant quote "识别图纸品类并生成报价报告。" --file C:\path\to\drawing.pdf --max-review-rounds 3
+```
+python -m quote_assistant quote "识别图纸品类并生成报价报告。" --file /path/to/drawing.pdf --max-review-rounds 3
 ```
 
 需要在正式报告末尾显示审核记录时：
 
-```powershell
-python -m quote_assistant quote "识别图纸品类并生成报价报告。" --file C:\path\to\drawing.pdf --audit
+```
+python -m quote_assistant quote "识别图纸品类并生成报价报告。" --file /path/to/drawing.pdf --audit
 ```
 
 ## 自动报价
 
 启动监听：
 
-```powershell
+```
 python -m quote_assistant watch --inbox inbox --outbox outbox
 ```
 
@@ -149,7 +148,7 @@ python -m quote_assistant watch --inbox inbox --outbox outbox
 
 自动模式同样支持审核循环：
 
-```powershell
+```
 python -m quote_assistant watch --inbox inbox --outbox outbox --max-review-rounds 3 --audit
 ```
 
@@ -176,7 +175,7 @@ python -m quote_assistant watch --inbox inbox --outbox outbox --max-review-round
 
 启动 Web/API：
 
-```powershell
+```
 python -m quote_assistant serve --host 0.0.0.0 --port 8000
 ```
 
