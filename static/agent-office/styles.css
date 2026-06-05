@@ -793,15 +793,16 @@ body::before {
 .agent-name-tag {
   left: 50%;
   right: auto;
-  bottom: -22px;
+  bottom: -24px;
   z-index: 6;
   max-width: 132px;
   min-height: 22px;
   transform: translateX(-50%);
-  border: 1px solid rgba(255, 255, 255, 0.74);
-  border-radius: 8px;
-  padding: 4px 8px;
-  background: var(--agent-accent, #3a97ff);
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  border-left: 4px solid var(--agent-accent, #3a97ff);
+  border-radius: 7px;
+  padding: 4px 8px 4px 7px;
+  background: rgba(17, 19, 23, 0.9);
   color: #fff;
   font-size: 0.7rem;
   font-weight: 800;
@@ -819,7 +820,7 @@ body::before {
 }
 
 .agent-figure.standing .agent-name-tag {
-  bottom: -24px;
+  bottom: -26px;
   max-width: 138px;
 }
 

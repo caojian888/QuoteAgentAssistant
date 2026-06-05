@@ -571,12 +571,11 @@ function renderDeskGrid() {
     const monitorTone = occupant ? occupant.monitor : "";
     const stationClass = occupant ? "occupied" : "empty";
     const activeClass = occupant && station.occupant === app.activeAgentId ? "active" : "";
-    const stationLabel = occupant ? occupant.name : station.label;
     const caption = occupant ? occupant.role : station.label;
 
     return `
       <article class="desk-slot ${stationClass} ${activeClass}">
-        <span class="desk-label">${escapeHtml(stationLabel)}</span>
+        ${occupant ? "" : `<span class="desk-label">${escapeHtml(station.label)}</span>`}
         <div class="desk-set">
           <span class="desk-shadow"></span>
           <span class="monitor ${monitorTone}"></span>
