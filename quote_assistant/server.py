@@ -13,6 +13,7 @@ import uuid
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 from urllib.parse import quote
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -53,6 +54,7 @@ from .feishu_auth import (
     fetch_feishu_user_profile,
 )
 from .model_config import build_model_config
+from .office_events import bind_office_event_context, log_office_event, read_office_events, reset_office_event_context
 from .office_state import build_office_state
 from .qc import build_prompt_with_vision_context, extract_vision_context, generate_once, review_once
 from .runtime_config import PROJECT_ROOT, load_runtime_env, runtime_data_dir
@@ -806,6 +808,14 @@ async def run_job_langgraph(
     record.review_status = "pending"
     record.updated_at = now_iso()
     write_status(record)
+    event_token = bind_office_event_context(record.job_id, job_dir(record.job_id))
+    log_office_event(
+        "quote_job",
+        "job_started",
+        status="running",
+        message="报价任务开始执行。",
+        metadata={"engine": "langgraph", "files": len(files), "max_review_rounds": max_review_rounds, "audit": audit},
+    )
 
     report_path = job_dir(record.job_id) / "report.md"
     audit_path = job_dir(record.job_id) / "review.md"
@@ -886,6 +896,13 @@ async def run_job_langgraph(
                     "quote langgraph draft ready job_id=%s chars=%s",
                     record.job_id,
                     len(candidate_report),
+                )
+                log_office_event(
+                    "quote_job",
+                    "draft_ready",
+                    status="running",
+                    message="报价初版已生成，进入审核/输出阶段。",
+                    metadata={"chars": len(candidate_report), "review_status": record.review_status},
                 )
 
         final_report = str(final_state.get("final_report") or final_state.get("candidate_report") or "")
@@ -994,6 +1011,13 @@ async def run_job_langgraph(
         record.report_path = str(report_path)
         record.updated_at = now_iso()
         write_status(record)
+        log_office_event(
+            "quote_job",
+            "job_completed",
+            status="done",
+            message="报价任务已完成。",
+            metadata={"review_status": record.review_status, "report_chars": len(final_report)},
+        )
         logger.info(
             "quote langgraph completed job_id=%s review_status=%s report_chars=%s",
             record.job_id,
@@ -1018,6 +1042,16 @@ async def run_job_langgraph(
             record.review_status = "skipped"
         record.updated_at = now_iso()
         write_status(record)
+        log_office_event(
+            "quote_job",
+            "job_failed" if record.status == "failed" else "job_completed_with_review_error",
+            status="failed" if record.status == "failed" else "done",
+            message="报价任务执行失败。" if record.status == "failed" else "报价任务已完成，但审核阶段异常。",
+            error=str(exc),
+            metadata={"review_status": record.review_status},
+        )
+    finally:
+        reset_office_event_context(event_token)
 
 
 async def run_job(
@@ -1033,6 +1067,14 @@ async def run_job(
     record.review_status = "pending"
     record.updated_at = now_iso()
     write_status(record)
+    event_token = bind_office_event_context(record.job_id, job_dir(record.job_id))
+    log_office_event(
+        "quote_job",
+        "job_started",
+        status="running",
+        message="报价任务开始执行。",
+        metadata={"engine": "fallback", "files": len(files), "max_review_rounds": max_review_rounds, "audit": audit},
+    )
 
     try:
         report, review_prompt, models = await generate_initial_report(
@@ -1049,11 +1091,25 @@ async def run_job(
         record.review_status = "running" if max_review_rounds > 0 else "skipped"
         record.updated_at = now_iso()
         write_status(record)
+        log_office_event(
+            "quote_job",
+            "draft_ready",
+            status="running",
+            message="报价初版已生成，进入审核阶段。",
+            metadata={"chars": len(report), "review_status": record.review_status},
+        )
 
         if max_review_rounds <= 0:
             record.status = "completed"
             record.updated_at = now_iso()
             write_status(record)
+            log_office_event(
+                "quote_job",
+                "job_completed",
+                status="done",
+                message="报价任务已完成。",
+                metadata={"review_status": record.review_status, "report_chars": len(report)},
+            )
             return
 
         try:
@@ -1086,12 +1142,29 @@ async def run_job(
         record.status = "completed"
         record.updated_at = now_iso()
         write_status(record)
+        log_office_event(
+            "quote_job",
+            "job_completed",
+            status="done",
+            message="报价任务已完成。",
+            metadata={"review_status": record.review_status, "report_chars": len(report)},
+        )
     except Exception as exc:
         record.status = "failed"
         record.error = str(exc)
         record.review_status = "skipped"
         record.updated_at = now_iso()
         write_status(record)
+        log_office_event(
+            "quote_job",
+            "job_failed",
+            status="failed",
+            message="报价任务执行失败。",
+            error=str(exc),
+            metadata={"review_status": record.review_status},
+        )
+    finally:
+        reset_office_event_context(event_token)
 
 
 @app.get("/health")
@@ -1595,10 +1668,21 @@ async def get_office_state(request: Request) -> dict:
         include_all=include_all,
         limit=50 if include_all else 30,
     )
+    events_by_job: dict[str, list[dict[str, Any]]] = {}
+    for job in jobs_payload:
+        job_id = str(job.get("job_id") or "")
+        if not job_id:
+            continue
+        try:
+            events_by_job[job_id] = read_office_events(job_dir(job_id), limit=40)
+        except Exception:
+            logger.exception("failed to read office events job_id=%s", job_id)
+            events_by_job[job_id] = []
     return build_office_state(
         jobs_payload,
         username=auth.username,
         is_admin=include_all,
+        events_by_job=events_by_job,
     )
 
 

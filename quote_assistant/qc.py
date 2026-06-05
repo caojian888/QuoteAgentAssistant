@@ -13,6 +13,7 @@ from agents import Runner
 
 from .agents import SPECIALISTS, build_agent_system, build_review_agent, build_vision_agent, skill_block
 from .io import build_agent_input
+from .office_events import log_office_event
 from .responses_vision import create_vision_summary
 from .responses_text import create_text_response
 
@@ -322,21 +323,67 @@ async def extract_vision_context(
         endpoint_mode,
         bool(previous_summary or review_feedback),
     )
-    if endpoint_mode in {"auto", "responses"}:
-        try:
-            result = await run_with_retries(lambda: create_vision_summary(vision_prompt, files, vision_model_name))
-            logger.info("quote vision done via responses chars=%s", len(result))
-            return result
-        except Exception as exc:
-            if endpoint_mode == "responses" or not should_fallback_to_chat_vision(exc):
-                raise
-            logger.warning("quote vision responses failed; falling back to chat: %s", exc)
+    log_office_event(
+        "quote_vision_agent",
+        "vision_started",
+        status="running",
+        message="quote_vision_agent 开始提取附件事实。",
+        metadata={
+            "files": len(files),
+            "model": vision_model_name,
+            "endpoint_mode": endpoint_mode,
+            "retry": bool(previous_summary or review_feedback),
+        },
+    )
+    try:
+        if endpoint_mode in {"auto", "responses"}:
+            try:
+                result = await run_with_retries(lambda: create_vision_summary(vision_prompt, files, vision_model_name))
+                logger.info("quote vision done via responses chars=%s", len(result))
+                log_office_event(
+                    "quote_vision_agent",
+                    "vision_completed",
+                    status="done",
+                    message="quote_vision_agent 已完成附件事实提取。",
+                    metadata={"endpoint": "responses", "chars": len(result), "files": len(files)},
+                )
+                return result
+            except Exception as exc:
+                if endpoint_mode == "responses" or not should_fallback_to_chat_vision(exc):
+                    raise
+                log_office_event(
+                    "quote_vision_agent",
+                    "vision_fallback",
+                    status="running",
+                    message="Responses 识图失败，切换到 chat Agent 继续。",
+                    metadata={"from": "responses", "to": "chat"},
+                    error=str(exc),
+                )
+                logger.warning("quote vision responses failed; falling back to chat: %s", exc)
 
-    agent = build_vision_agent(vision_model)
-    vision_input = build_agent_input(vision_prompt, files)
-    result = await run_agent_with_retries(agent, vision_input)
-    logger.info("quote vision done via chat chars=%s", len(str(result.final_output)))
-    return str(result.final_output)
+        agent = build_vision_agent(vision_model)
+        vision_input = build_agent_input(vision_prompt, files)
+        result = await run_agent_with_retries(agent, vision_input)
+        output = str(result.final_output)
+        logger.info("quote vision done via chat chars=%s", len(output))
+        log_office_event(
+            "quote_vision_agent",
+            "vision_completed",
+            status="done",
+            message="quote_vision_agent 已完成附件事实提取。",
+            metadata={"endpoint": "chat", "chars": len(output), "files": len(files)},
+        )
+        return output
+    except Exception as exc:
+        log_office_event(
+            "quote_vision_agent",
+            "vision_failed",
+            status="failed",
+            message="quote_vision_agent 附件事实提取失败。",
+            metadata={"files": len(files), "endpoint_mode": endpoint_mode},
+            error=str(exc),
+        )
+        raise
 
 
 async def generate_once(
@@ -348,30 +395,62 @@ async def generate_once(
     endpoint_mode = work_endpoint_mode()
     model_name = work_model_name or (work_model if isinstance(work_model, str) else os.getenv("QUOTE_WORK_MODEL"))
     logger.info("quote work generation start files=%s endpoint_mode=%s", len(files), endpoint_mode)
-
-    if endpoint_mode == "responses":
-        if files:
-            raise RuntimeError("QUOTE_WORK_ENDPOINT=responses only supports text input after vision extraction.")
-        if not model_name:
-            raise RuntimeError("Missing work model name for Responses API.")
-        result = await run_with_retries(
-            lambda: create_text_response(
-                prompt=prompt,
-                model_name=str(model_name),
-                instructions=WORK_INSTRUCTIONS,
-                base_url=work_base_url(),
-                api_key=work_api_key(),
-                stream_env_name="QUOTE_WORK_STREAM",
+    log_office_event(
+        "quote_costing_agent",
+        "costing_started",
+        status="running",
+        message="quote_costing_agent 开始生成报价报告。",
+        metadata={"files": len(files), "endpoint_mode": endpoint_mode, "model": model_name},
+    )
+    try:
+        if endpoint_mode == "responses":
+            if files:
+                raise RuntimeError("QUOTE_WORK_ENDPOINT=responses only supports text input after vision extraction.")
+            if not model_name:
+                raise RuntimeError("Missing work model name for Responses API.")
+            result = await run_with_retries(
+                lambda: create_text_response(
+                    prompt=prompt,
+                    model_name=str(model_name),
+                    instructions=WORK_INSTRUCTIONS,
+                    base_url=work_base_url(),
+                    api_key=work_api_key(),
+                    stream_env_name="QUOTE_WORK_STREAM",
+                )
             )
-        )
-        logger.info("quote work generation done via responses chars=%s", len(result))
-        return result
+            logger.info("quote work generation done via responses chars=%s", len(result))
+            log_office_event(
+                "quote_costing_agent",
+                "costing_completed",
+                status="done",
+                message="quote_costing_agent 已生成报价报告。",
+                metadata={"endpoint": "responses", "chars": len(result), "files": len(files)},
+            )
+            return result
 
-    agent = build_agent_system(work_model)
-    agent_input = build_agent_input(prompt, files)
-    result = await run_agent_with_retries(agent, agent_input)
-    logger.info("quote work generation done chars=%s", len(str(result.final_output)))
-    return str(result.final_output)
+        agent = build_agent_system(work_model)
+        agent_input = build_agent_input(prompt, files)
+        result = await run_agent_with_retries(agent, agent_input)
+        output = str(result.final_output)
+        logger.info("quote work generation done chars=%s", len(output))
+        log_office_event(
+            "quote_costing_agent",
+            "costing_completed",
+            status="done",
+            message="quote_costing_agent 已生成报价报告。",
+            metadata={"endpoint": "chat", "chars": len(output), "files": len(files)},
+        )
+        return output
+    except Exception as exc:
+        log_office_event(
+            "quote_costing_agent",
+            "costing_failed",
+            status="failed",
+            message="quote_costing_agent 报价报告生成失败。",
+            metadata={"files": len(files), "endpoint_mode": endpoint_mode, "model": model_name},
+            error=str(exc),
+        )
+        raise
 
 
 async def review_once(
@@ -390,26 +469,70 @@ async def review_once(
         review_model_name,
         endpoint_mode,
     )
-
-    if endpoint_mode == "responses":
-        result = await run_with_retries(
-            lambda: create_text_response(
-                prompt=review_prompt,
-                model_name=review_model_name,
-                instructions=REVIEW_INSTRUCTIONS,
-                base_url=review_base_url(),
-                api_key=review_api_key(),
-                stream_env_name="QUOTE_REVIEW_STREAM",
+    log_office_event(
+        "quote_review_agent",
+        "review_started",
+        status="running",
+        message="quote_review_agent 开始复核报价报告。",
+        metadata={"files": len(files), "report_chars": len(candidate_report), "endpoint_mode": endpoint_mode},
+    )
+    try:
+        if endpoint_mode == "responses":
+            result = await run_with_retries(
+                lambda: create_text_response(
+                    prompt=review_prompt,
+                    model_name=review_model_name,
+                    instructions=REVIEW_INSTRUCTIONS,
+                    base_url=review_base_url(),
+                    api_key=review_api_key(),
+                    stream_env_name="QUOTE_REVIEW_STREAM",
+                )
             )
-        )
-        logger.info("quote review done via responses chars=%s", len(result))
-        return parse_review(result)
+            logger.info("quote review done via responses chars=%s", len(result))
+            outcome = parse_review(result)
+            log_office_event(
+                "quote_review_agent",
+                "review_completed",
+                status="done" if outcome.passed else "failed",
+                message="quote_review_agent 已完成报价报告复核。",
+                metadata={
+                    "endpoint": "responses",
+                    "verdict": outcome.verdict,
+                    "confidence": outcome.confidence,
+                    "issues": len(outcome.issues),
+                },
+            )
+            return outcome
 
-    reviewer = build_review_agent(review_model)
-    review_input = build_agent_input(review_prompt, files)
-    result = await run_agent_with_retries(reviewer, review_input)
-    logger.info("quote review done via chat chars=%s", len(str(result.final_output)))
-    return parse_review(str(result.final_output))
+        reviewer = build_review_agent(review_model)
+        review_input = build_agent_input(review_prompt, files)
+        result = await run_agent_with_retries(reviewer, review_input)
+        output = str(result.final_output)
+        logger.info("quote review done via chat chars=%s", len(output))
+        outcome = parse_review(output)
+        log_office_event(
+            "quote_review_agent",
+            "review_completed",
+            status="done" if outcome.passed else "failed",
+            message="quote_review_agent 已完成报价报告复核。",
+            metadata={
+                "endpoint": "chat",
+                "verdict": outcome.verdict,
+                "confidence": outcome.confidence,
+                "issues": len(outcome.issues),
+            },
+        )
+        return outcome
+    except Exception as exc:
+        log_office_event(
+            "quote_review_agent",
+            "review_failed",
+            status="failed",
+            message="quote_review_agent 报价报告复核失败。",
+            metadata={"files": len(files), "report_chars": len(candidate_report), "endpoint_mode": endpoint_mode},
+            error=str(exc),
+        )
+        raise
 
 
 async def run_with_quality_loop(

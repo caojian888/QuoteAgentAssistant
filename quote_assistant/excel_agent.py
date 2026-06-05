@@ -22,6 +22,7 @@ from .excel_audit import (
 )
 from .excel_rules import apply_sheet_metal_template_rules
 from .excel_template import ExcelBuildResult, build_sheet_metal_workbook
+from .office_events import log_office_event
 from .qc import run_agent_with_retries, run_with_retries, work_api_key, work_base_url, work_endpoint_mode
 from .responses_text import create_text_response
 from .row_images import generate_row_image_assets
@@ -278,32 +279,62 @@ async def generate_excel_payload(
         model_name,
         len(final_report),
     )
-
-    if endpoint_mode == "responses":
-        if not model_name:
-            raise RuntimeError("Missing work model name for Excel Agent Responses call.")
-        output = await run_with_retries(
-            lambda: create_text_response(
-                prompt=prompt,
-                model_name=str(model_name),
-                instructions=EXCEL_AGENT_INSTRUCTIONS,
-                base_url=work_base_url(),
-                api_key=work_api_key(),
-                stream_env_name="QUOTE_EXCEL_STREAM",
+    log_office_event(
+        "quote_excel_output_agent",
+        "excel_output_started",
+        status="running",
+        message="quote_excel_output_agent 开始生成 Excel 成本表 payload。",
+        metadata={
+            "endpoint_mode": endpoint_mode,
+            "model": model_name,
+            "report_chars": len(final_report),
+            "has_bom_decomposition": bool(bom_decomposition),
+            "has_audit_feedback": bool(excel_audit_feedback),
+        },
+    )
+    try:
+        if endpoint_mode == "responses":
+            if not model_name:
+                raise RuntimeError("Missing work model name for Excel Agent Responses call.")
+            output = await run_with_retries(
+                lambda: create_text_response(
+                    prompt=prompt,
+                    model_name=str(model_name),
+                    instructions=EXCEL_AGENT_INSTRUCTIONS,
+                    base_url=work_base_url(),
+                    api_key=work_api_key(),
+                    stream_env_name="QUOTE_EXCEL_STREAM",
+                )
             )
-        )
-    else:
-        agent = Agent(
-            name="quote_excel_output_agent",
-            model=work_model,
-            instructions=EXCEL_AGENT_INSTRUCTIONS,
-        )
-        result = await run_agent_with_retries(agent, prompt)
-        output = str(result.final_output)
+        else:
+            agent = Agent(
+                name="quote_excel_output_agent",
+                model=work_model,
+                instructions=EXCEL_AGENT_INSTRUCTIONS,
+            )
+            result = await run_agent_with_retries(agent, prompt)
+            output = str(result.final_output)
 
-    payload = extract_json_object(output)
-    logger.info("quote excel agent done rows=%s", len(payload.get("rows") or []))
-    return payload
+        payload = extract_json_object(output)
+        logger.info("quote excel agent done rows=%s", len(payload.get("rows") or []))
+        log_office_event(
+            "quote_excel_output_agent",
+            "excel_output_completed",
+            status="done",
+            message="quote_excel_output_agent 已生成 Excel 成本表 payload。",
+            metadata={"endpoint": endpoint_mode, "rows": len(payload.get("rows") or [])},
+        )
+        return payload
+    except Exception as exc:
+        log_office_event(
+            "quote_excel_output_agent",
+            "excel_output_failed",
+            status="failed",
+            message="quote_excel_output_agent 生成 Excel 成本表 payload 失败。",
+            metadata={"endpoint_mode": endpoint_mode, "model": model_name},
+            error=str(exc),
+        )
+        raise
 
 
 async def generate_sheet_metal_excel(
@@ -401,6 +432,13 @@ async def generate_sheet_metal_excel(
 
         if not rows:
             logger.info("quote excel agent skipped: no sheet-metal rows")
+            log_office_event(
+                "quote_excel_output_agent",
+                "excel_output_skipped",
+                status="done",
+                message="quote_excel_output_agent 未识别到可写入模板的明细行，跳过 Excel 输出。",
+                metadata={"attempt": attempt_number},
+            )
             return None
 
         payload_path.parent.mkdir(parents=True, exist_ok=True)

@@ -11,6 +11,7 @@ import httpx
 from agents import Agent
 
 from .io import build_agent_input
+from .office_events import log_office_event
 from .qc import run_agent_with_retries, run_with_retries, work_api_key, work_base_url, work_endpoint_mode
 from .responses_text import create_streaming_response, create_text_response, env_flag, env_float, response_text
 from .responses_vision import api_key as vision_api_key
@@ -321,45 +322,90 @@ async def generate_bom_decomposition_payload(
         len(final_report),
         len(vision_context),
     )
+    log_office_event(
+        "quote_bom_decomposition_agent",
+        "bom_decomposition_started",
+        status="running",
+        message="quote_bom_decomposition_agent 开始拆解 BOM/图纸层级。",
+        metadata={
+            "endpoint_mode": endpoint_mode,
+            "model": model_name,
+            "report_chars": len(final_report),
+            "vision_chars": len(vision_context),
+            "vision_files": len(vision_files or []),
+        },
+    )
+    try:
+        if vision_files and vision_model_name:
+            try:
+                output = await run_with_retries(
+                    lambda: create_bom_vision_response(prompt, vision_files, vision_model_name)
+                )
+                payload = extract_json_object(output)
+                logger.info(
+                    "quote bom decomposition agent done via vision rows=%s files=%s model=%s",
+                    len(payload.get("rows") or []),
+                    len(vision_files),
+                    vision_model_name,
+                )
+                log_office_event(
+                    "quote_bom_decomposition_agent",
+                    "bom_decomposition_completed",
+                    status="done",
+                    message="quote_bom_decomposition_agent 已完成 BOM/图纸层级拆解。",
+                    metadata={"endpoint": "vision", "rows": len(payload.get("rows") or []), "files": len(vision_files)},
+                )
+                return payload
+            except Exception as exc:
+                log_office_event(
+                    "quote_bom_decomposition_agent",
+                    "bom_decomposition_fallback",
+                    status="running",
+                    message="BOM 视觉拆解失败，切换到文本拆解继续。",
+                    metadata={"from": "vision", "to": endpoint_mode},
+                    error=str(exc),
+                )
+                logger.warning("quote bom decomposition vision failed; falling back to text: %s", exc)
 
-    if vision_files and vision_model_name:
-        try:
+        if endpoint_mode == "responses":
+            if not model_name:
+                raise RuntimeError("Missing work model name for BOM decomposition Responses call.")
             output = await run_with_retries(
-                lambda: create_bom_vision_response(prompt, vision_files, vision_model_name)
+                lambda: create_text_response(
+                    prompt=prompt,
+                    model_name=str(model_name),
+                    instructions=BOM_DECOMPOSITION_INSTRUCTIONS,
+                    base_url=work_base_url(),
+                    api_key=work_api_key(),
+                    stream_env_name="QUOTE_BOM_STREAM",
+                )
             )
-            payload = extract_json_object(output)
-            logger.info(
-                "quote bom decomposition agent done via vision rows=%s files=%s model=%s",
-                len(payload.get("rows") or []),
-                len(vision_files),
-                vision_model_name,
-            )
-            return payload
-        except Exception as exc:
-            logger.warning("quote bom decomposition vision failed; falling back to text: %s", exc)
-
-    if endpoint_mode == "responses":
-        if not model_name:
-            raise RuntimeError("Missing work model name for BOM decomposition Responses call.")
-        output = await run_with_retries(
-            lambda: create_text_response(
-                prompt=prompt,
-                model_name=str(model_name),
+        else:
+            agent = Agent(
+                name="quote_bom_decomposition_agent",
+                model=work_model,
                 instructions=BOM_DECOMPOSITION_INSTRUCTIONS,
-                base_url=work_base_url(),
-                api_key=work_api_key(),
-                stream_env_name="QUOTE_BOM_STREAM",
             )
-        )
-    else:
-        agent = Agent(
-            name="quote_bom_decomposition_agent",
-            model=work_model,
-            instructions=BOM_DECOMPOSITION_INSTRUCTIONS,
-        )
-        result = await run_agent_with_retries(agent, prompt)
-        output = str(result.final_output)
+            result = await run_agent_with_retries(agent, prompt)
+            output = str(result.final_output)
 
-    payload = extract_json_object(output)
-    logger.info("quote bom decomposition agent done rows=%s", len(payload.get("rows") or []))
-    return payload
+        payload = extract_json_object(output)
+        logger.info("quote bom decomposition agent done rows=%s", len(payload.get("rows") or []))
+        log_office_event(
+            "quote_bom_decomposition_agent",
+            "bom_decomposition_completed",
+            status="done",
+            message="quote_bom_decomposition_agent 已完成 BOM/图纸层级拆解。",
+            metadata={"endpoint": endpoint_mode, "rows": len(payload.get("rows") or [])},
+        )
+        return payload
+    except Exception as exc:
+        log_office_event(
+            "quote_bom_decomposition_agent",
+            "bom_decomposition_failed",
+            status="failed",
+            message="quote_bom_decomposition_agent BOM/图纸层级拆解失败。",
+            metadata={"endpoint_mode": endpoint_mode, "model": model_name},
+            error=str(exc),
+        )
+        raise

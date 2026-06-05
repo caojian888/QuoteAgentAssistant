@@ -8,6 +8,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from .excel_template import ExcelBuildResult
+from .office_events import log_office_event
 
 
 logger = logging.getLogger("uvicorn.error")
@@ -467,35 +468,65 @@ async def run_excel_audit_agent(
         model_name,
         len(payload.get("rows") or []),
     )
-
-    if endpoint_mode == "responses":
-        if not model_name:
-            raise RuntimeError("Missing review model name for Excel audit Responses call.")
-        output = await run_with_retries(
-            lambda: create_text_response(
-                prompt=prompt,
-                model_name=str(model_name),
-                instructions=EXCEL_AUDIT_INSTRUCTIONS,
-                base_url=review_base_url(),
-                api_key=review_api_key(),
-                stream_env_name="QUOTE_EXCEL_AUDIT_STREAM",
+    log_office_event(
+        "quote_excel_audit_agent",
+        "excel_audit_started",
+        status="running",
+        message="quote_excel_audit_agent 开始审核 Excel payload。",
+        metadata={"endpoint_mode": endpoint_mode, "model": model_name, "rows": len(payload.get("rows") or [])},
+    )
+    try:
+        if endpoint_mode == "responses":
+            if not model_name:
+                raise RuntimeError("Missing review model name for Excel audit Responses call.")
+            output = await run_with_retries(
+                lambda: create_text_response(
+                    prompt=prompt,
+                    model_name=str(model_name),
+                    instructions=EXCEL_AUDIT_INSTRUCTIONS,
+                    base_url=review_base_url(),
+                    api_key=review_api_key(),
+                    stream_env_name="QUOTE_EXCEL_AUDIT_STREAM",
+                )
             )
-        )
-    else:
-        if review_model is None:
-            raise RuntimeError("Missing review model object for Excel audit chat call.")
-        from agents import Agent
+        else:
+            if review_model is None:
+                raise RuntimeError("Missing review model object for Excel audit chat call.")
+            from agents import Agent
 
-        agent = Agent(
-            name="quote_excel_audit_agent",
-            model=review_model,
-            instructions=EXCEL_AUDIT_INSTRUCTIONS,
-        )
-        result = await run_agent_with_retries(agent, prompt)
-        output = str(result.final_output)
+            agent = Agent(
+                name="quote_excel_audit_agent",
+                model=review_model,
+                instructions=EXCEL_AUDIT_INSTRUCTIONS,
+            )
+            result = await run_agent_with_retries(agent, prompt)
+            output = str(result.final_output)
 
-    logger.info("quote excel audit agent done chars=%s", len(output))
-    return extract_json_object(output), output
+        logger.info("quote excel audit agent done chars=%s", len(output))
+        parsed = extract_json_object(output)
+        log_office_event(
+            "quote_excel_audit_agent",
+            "excel_audit_completed",
+            status="done",
+            message="quote_excel_audit_agent 已完成 Excel payload 审核。",
+            metadata={
+                "endpoint": endpoint_mode,
+                "chars": len(output),
+                "verdict": parsed.get("verdict"),
+                "quality_level": parsed.get("quality_level"),
+            },
+        )
+        return parsed, output
+    except Exception as exc:
+        log_office_event(
+            "quote_excel_audit_agent",
+            "excel_audit_failed",
+            status="failed",
+            message="quote_excel_audit_agent Excel payload 审核失败。",
+            metadata={"endpoint_mode": endpoint_mode, "model": model_name, "rows": len(payload.get("rows") or [])},
+            error=str(exc),
+        )
+        raise
 
 
 def merge_excel_audit_results(
