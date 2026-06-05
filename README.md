@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Quote Agent Assistant
 
 这是一个“独立/自动报价助手”MVP，把 `D:\cost-model-skills` 里的 6 个 Markdown skill 包装成一个多 Agent 系统。
@@ -216,3 +217,7 @@ GET /api/jobs/{job_id}/report
 2. 增加材料价格表或 ERP/数据库接口。
 3. 做一个网页上传界面，给业务人员直接拖拽图纸。
 4. 增加人工复核流：AI 报价后由工程/报价人员确认再归档。
+=======
+# QuoteAgentAssistant
+智能报价
+>>>>>>> c43c94ff133c4e0902fd8d6870dbc398bbd9e3bf
