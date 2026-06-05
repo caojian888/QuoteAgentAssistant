@@ -13,6 +13,7 @@ import uuid
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -52,6 +53,7 @@ from .feishu_auth import (
     fetch_feishu_user_profile,
 )
 from .model_config import build_model_config
+from .office_state import build_office_state
 from .qc import build_prompt_with_vision_context, extract_vision_context, generate_once, review_once
 from .runtime_config import PROJECT_ROOT, load_runtime_env, runtime_data_dir
 
@@ -60,7 +62,9 @@ load_runtime_env()
 DATA_DIR = runtime_data_dir()
 JOBS_DIR = DATA_DIR / "jobs"
 STATIC_DIR = PROJECT_ROOT / "static"
+OFFICE_PAGE_PATH = PROJECT_ROOT / "templates" / "agent-office.html"
 FEISHU_STATE_COOKIE_NAME = "quote_feishu_oauth_state"
+FEISHU_NEXT_COOKIE_NAME = "quote_feishu_oauth_next"
 logger = logging.getLogger("uvicorn.error")
 
 
@@ -149,6 +153,21 @@ def feishu_redirect_uri(request: Request) -> str:
     if configured:
         return configured
     return f"{public_base_url(request)}/auth/feishu/callback"
+
+
+def safe_next_url(value: str | None, default: str = "/") -> str:
+    candidate = (value or "").strip()
+    if not candidate:
+        return default
+    if not candidate.startswith("/") or candidate.startswith("//"):
+        return default
+    if "\\" in candidate or any(character in candidate for character in "\r\n\0"):
+        return default
+    return candidate
+
+
+def login_redirect(next_url: str = "/") -> RedirectResponse:
+    return RedirectResponse(f"/login?next={quote(safe_next_url(next_url), safe='')}", status_code=303)
 
 
 def current_auth(request: Request) -> AuthContext | None:
@@ -1080,12 +1099,14 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.get("/static/{file_name}")
-async def static_file(file_name: str) -> FileResponse:
-    safe_file = Path(file_name).name
-    path = (STATIC_DIR / safe_file).resolve()
+@app.get("/static/{file_path:path}")
+async def static_file(file_path: str) -> FileResponse:
+    if not file_path or "\0" in file_path:
+        raise HTTPException(status_code=404, detail="Static file not found.")
+    static_root = STATIC_DIR.resolve()
+    path = (static_root / file_path).resolve()
     try:
-        path.relative_to(STATIC_DIR.resolve())
+        path.relative_to(static_root)
     except ValueError:
         raise HTTPException(status_code=404, detail="Static file not found.") from None
     if not path.exists() or not path.is_file():
@@ -1093,14 +1114,17 @@ async def static_file(file_name: str) -> FileResponse:
     return FileResponse(path)
 
 
-def login_page(error: str = "") -> str:
+def login_page(error: str = "", next_url: str = "/") -> str:
     escaped_error = html.escape(error)
+    safe_next = safe_next_url(next_url)
+    escaped_next = html.escape(safe_next, quote=True)
+    feishu_next_query = f"?next={quote(safe_next, safe='')}" if safe_next != "/" else ""
     error_block = f'<div class="error">{escaped_error}</div>' if escaped_error else ""
     feishu_block = ""
     if feishu_login_enabled():
-        feishu_block = """
+        feishu_block = f"""
     <div class="login-divider"><span>或</span></div>
-    <a class="feishu-button" href="/auth/feishu/start">使用飞书登录</a>
+    <a class="feishu-button" href="/auth/feishu/start{feishu_next_query}">使用飞书登录</a>
 """
     return f"""
 <!doctype html>
@@ -1387,6 +1411,7 @@ def login_page(error: str = "") -> str:
     <h1 id="login-title">欢迎回来</h1>
     <p class="subtitle">登录 Quote Agent Assistant，进入成本报价工作台。</p>
     <form action="/login" method="post">
+      <input type="hidden" name="next" value="{escaped_next}" />
       {error_block}
       <div class="field">
         <label for="username">用户名</label>
@@ -1407,20 +1432,22 @@ def login_page(error: str = "") -> str:
 
 
 @app.get("/login", response_class=HTMLResponse)
-async def login_get(request: Request):
+async def login_get(request: Request, next: str | None = None):
+    next_url = safe_next_url(next)
     if not db_enabled():
-        return HTMLResponse(login_page("数据库登录尚未启用。"))
+        return HTMLResponse(login_page("数据库登录尚未启用。", next_url))
     if current_auth(request):
-        return RedirectResponse("/", status_code=303)
-    return HTMLResponse(login_page())
+        return RedirectResponse(next_url, status_code=303)
+    return HTMLResponse(login_page(next_url=next_url))
 
 
 @app.get("/auth/feishu/start")
-async def feishu_start(request: Request):
+async def feishu_start(request: Request, next: str | None = None):
+    next_url = safe_next_url(next)
     if not db_enabled():
-        return HTMLResponse(login_page("数据库登录尚未启用。"), status_code=503)
+        return HTMLResponse(login_page("数据库登录尚未启用。", next_url), status_code=503)
     if not feishu_login_enabled():
-        return HTMLResponse(login_page("飞书登录尚未启用。"), status_code=503)
+        return HTMLResponse(login_page("飞书登录尚未启用。", next_url), status_code=503)
 
     state = secrets.token_urlsafe(24)
     response = RedirectResponse(
@@ -1430,6 +1457,14 @@ async def feishu_start(request: Request):
     response.set_cookie(
         FEISHU_STATE_COOKIE_NAME,
         state,
+        max_age=10 * 60,
+        httponly=True,
+        secure=cookie_secure(),
+        samesite="lax",
+    )
+    response.set_cookie(
+        FEISHU_NEXT_COOKIE_NAME,
+        next_url,
         max_age=10 * 60,
         httponly=True,
         secure=cookie_secure(),
@@ -1486,7 +1521,8 @@ async def feishu_callback(
         user_agent=request.headers.get("user-agent", ""),
         ip_address=client_host,
     )
-    response = RedirectResponse("/", status_code=303)
+    next_url = safe_next_url(request.cookies.get(FEISHU_NEXT_COOKIE_NAME))
+    response = RedirectResponse(next_url, status_code=303)
     response.set_cookie(
         SESSION_COOKIE_NAME,
         session_token,
@@ -1496,17 +1532,19 @@ async def feishu_callback(
         samesite="lax",
     )
     response.delete_cookie(FEISHU_STATE_COOKIE_NAME)
+    response.delete_cookie(FEISHU_NEXT_COOKIE_NAME)
     return response
 
 
 @app.post("/login")
-async def login_post(request: Request, username: str = Form(...), password: str = Form(...)):
+async def login_post(request: Request, username: str = Form(...), password: str = Form(...), next: str = Form("/")):
+    next_url = safe_next_url(next)
     if not db_enabled():
-        return HTMLResponse(login_page("数据库登录尚未启用。"), status_code=503)
+        return HTMLResponse(login_page("数据库登录尚未启用。", next_url), status_code=503)
 
     user = authenticate_user(username.strip(), password)
     if not user:
-        return HTMLResponse(login_page("用户名或密码错误。"), status_code=401)
+        return HTMLResponse(login_page("用户名或密码错误。", next_url), status_code=401)
 
     client_host = request.client.host if request.client else ""
     session_token = create_session(
@@ -1514,7 +1552,7 @@ async def login_post(request: Request, username: str = Form(...), password: str 
         user_agent=request.headers.get("user-agent", ""),
         ip_address=client_host,
     )
-    response = RedirectResponse("/", status_code=303)
+    response = RedirectResponse(next_url, status_code=303)
     response.set_cookie(
         SESSION_COOKIE_NAME,
         session_token,
@@ -1534,10 +1572,40 @@ async def logout(request: Request) -> RedirectResponse:
     return response
 
 
+@app.get("/office")
+async def office_alias() -> RedirectResponse:
+    return RedirectResponse("/agent-office", status_code=303)
+
+
+@app.get("/agent-office", response_class=HTMLResponse)
+async def agent_office(request: Request):
+    if auth_required() and not current_auth(request):
+        return login_redirect("/agent-office")
+    if not OFFICE_PAGE_PATH.exists() or not OFFICE_PAGE_PATH.is_file():
+        raise HTTPException(status_code=404, detail="Agent office page not found.")
+    return HTMLResponse(OFFICE_PAGE_PATH.read_text(encoding="utf-8"))
+
+
+@app.get("/api/office/state")
+async def get_office_state(request: Request) -> dict:
+    auth = require_token(request)
+    include_all = auth.role == "admin"
+    jobs_payload = list_jobs_for_user(
+        auth.user_id,
+        include_all=include_all,
+        limit=50 if include_all else 30,
+    )
+    return build_office_state(
+        jobs_payload,
+        username=auth.username,
+        is_admin=include_all,
+    )
+
+
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     if auth_required() and not current_auth(request):
-        return RedirectResponse("/login", status_code=303)
+        return login_redirect("/")
 
     return """
 <!doctype html>
@@ -1614,6 +1682,9 @@ async def home(request: Request):
     button:hover { box-shadow: 0 6px 16px rgba(0, 113, 227, .18); transform: translateY(-1px); }
     button:active { transform: translateY(0); box-shadow: none; }
     .secondary-button { width: 100%; margin-top: 16px; background: #1d1d1f; }
+    .office-link { width: 100%; min-height: 40px; margin-top: 10px; border: 1px solid var(--line); border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; padding: 10px 14px; background: #ffffff; color: var(--text); font-size: 14px; font-weight: 740; text-decoration: none; box-shadow: var(--shadow-soft); transition: transform .14s ease, box-shadow .14s ease, border-color .14s ease; }
+    .office-link:hover { border-color: rgba(0, 113, 227, .28); box-shadow: 0 8px 22px rgba(0, 113, 227, .10); transform: translateY(-1px); }
+    .office-link:active { transform: translateY(0); box-shadow: var(--shadow-soft); }
     button[disabled] { opacity: 1; cursor: not-allowed; box-shadow: none; transform: none; color: var(--muted); background: rgba(118, 118, 128, .14); }
     .row { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
     .settings-grid { display: grid; gap: 12px; grid-template-columns: minmax(180px, .8fr) minmax(220px, 1.2fr); }
@@ -1765,6 +1836,7 @@ async def home(request: Request):
       </div>
       <p class="hint">上传图纸或输入规格，系统会自动识别品类、生成报价，并经过审核 Agent 复核。</p>
       <button id="new-quote" class="secondary-button" type="button">新建成本报价</button>
+      <a class="office-link" href="/agent-office">Agent 办公室</a>
     </div>
     <section class="history-panel" aria-labelledby="history-title">
       <div class="history-heading">

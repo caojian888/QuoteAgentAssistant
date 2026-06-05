@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Virtual Office</title>
+  <link rel="stylesheet" href="/static/agent-office/styles.css">
+</head>
+<body>
+  <div class="page-shell">
+    <header class="topbar">
+      <div class="brand-block">
+        <p class="eyebrow">Quote Agent Assistant / Live Office</p>
+        <h1>虚拟办公室</h1>
+      </div>
+
+      <div class="topbar-meta">
+        <div id="room-buttons" class="room-buttons" role="tablist" aria-label="房间切换"></div>
+
+        <div class="status-chip">
+          <span class="dot"></span>
+          <span id="office-mode">办公室巡航</span>
+        </div>
+
+        <div id="data-source-chip" class="status-chip source-chip is-demo">
+          <span class="dot"></span>
+          <span id="data-source-label">Demo 数据</span>
+        </div>
+
+        <p id="sync-note" class="clock sync-note">未连接</p>
+        <a class="office-return-link" href="/">返回报价台</a>
+        <p id="clock" class="clock" aria-live="polite"></p>
+      </div>
+    </header>
+
+    <main class="studio-layout">
+      <aside class="left-rail">
+        <section class="prop-card">
+          <div class="prop-header">
+            <p class="eyebrow">展示墙</p>
+            <h2>周边与奖杯</h2>
+          </div>
+          <div class="showcase-shelf">
+            <div class="mug-row">
+              <span></span>
+              <span></span>
+              <span></span>
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+            <div class="badge-row">
+              <span></span>
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+            <div class="wall-screen"></div>
+          </div>
+        </section>
+
+        <section class="prop-card">
+          <div class="prop-header">
+            <p class="eyebrow">训练角</p>
+            <h2>跑步机</h2>
+          </div>
+          <div class="runner-scene">
+            <div class="runner-base"></div>
+            <div class="runner-rail"></div>
+            <div class="runner-stand"></div>
+          </div>
+        </section>
+
+        <section class="prop-card">
+          <div class="prop-header">
+            <p class="eyebrow">安静区</p>
+            <h2>独立小房间</h2>
+          </div>
+          <div class="quiet-scene">
+            <div class="quiet-wall"></div>
+            <div class="quiet-seat"></div>
+            <div class="quiet-lamp"></div>
+          </div>
+        </section>
+      </aside>
+
+      <section class="office-stage">
+        <div class="stage-header">
+          <div>
+            <p class="eyebrow">当前场景</p>
+            <h2 id="room-title">主办公区</h2>
+            <p id="room-description" class="room-description">
+              以工位为中心的日常协作空间，能一眼看清谁在工作、谁在待命、谁在排队等指令。
+            </p>
+          </div>
+
+          <div class="scene-actions">
+            <button class="action-button" data-scene="standup">切到晨会</button>
+            <button class="action-button" data-scene="sprint">进入冲刺</button>
+            <button class="action-button danger" data-scene="incident">故障演练</button>
+          </div>
+        </div>
+
+        <div id="office-floor" class="office-floor">
+          <div class="floor-grid"></div>
+          <div id="desk-grid" class="desk-grid"></div>
+        </div>
+
+        <section class="meeting-dock">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">现场对话</p>
+              <h3>Agent Stream</h3>
+            </div>
+          </div>
+          <div id="meeting-feed" class="meeting-feed"></div>
+        </section>
+      </section>
+
+      <aside class="ops-rail">
+        <section class="stats-panel">
+          <div class="token-grid">
+            <article class="metric-box">
+              <span>今日消耗 Token</span>
+              <div class="metric-line">
+                <strong id="metric-tokens-spent">0</strong>
+                <small id="metric-budget">/1000万</small>
+              </div>
+            </article>
+
+            <article class="metric-box">
+              <span>今日节省 Token</span>
+              <div class="metric-line">
+                <strong id="metric-tokens-saved">0</strong>
+              </div>
+              <small id="metric-saved-hint">复用率持续提升</small>
+            </article>
+          </div>
+
+          <div class="mini-stats">
+            <article>
+              <span>在线坐席</span>
+              <strong id="metric-agents">05</strong>
+            </article>
+            <article>
+              <span>待处理</span>
+              <strong id="metric-tasks">08</strong>
+            </article>
+            <article>
+              <span>今日决策</span>
+              <strong id="metric-decisions">08</strong>
+            </article>
+          </div>
+        </section>
+
+        <section class="task-feed-card">
+          <div class="section-heading compact">
+            <div>
+              <p class="eyebrow">任务流</p>
+              <h3>待办事务</h3>
+            </div>
+            <span id="task-count" class="pill-count">8个</span>
+          </div>
+          <div id="task-feed" class="task-feed"></div>
+        </section>
+
+        <section class="selected-card">
+          <div class="section-heading compact">
+            <div>
+              <p class="eyebrow">当前选中</p>
+              <h3 id="selected-agent-name">Marvis</h3>
+            </div>
+            <div class="agent-badge" id="selected-agent-badge">M</div>
+          </div>
+
+          <p id="selected-agent-role" class="selected-role">总协调 / 前台接待</p>
+          <p id="selected-agent-summary" class="selected-summary">
+            负责看大盘、分配工作、决定哪个 Agent 先上桌，保证办公室整体节奏顺滑。
+          </p>
+
+          <div class="mini-panel">
+            <span>当前负载</span>
+            <div class="meter">
+              <div id="load-bar" class="meter-fill"></div>
+            </div>
+          </div>
+
+          <div class="mini-panel">
+            <span>记忆胶囊</span>
+            <ul id="memory-list" class="memory-list"></ul>
+          </div>
+
+          <div class="mini-panel">
+            <span>最近输出</span>
+            <ul id="activity-list" class="activity-list"></ul>
+          </div>
+        </section>
+      </aside>
+    </main>
+  </div>
+
+  <script src="/static/agent-office/agent-office.config.js"></script>
+  <script src="/static/agent-office/script.js"></script>
+</body>
+</html>
