@@ -33,35 +33,35 @@ ROOMS = [
 
 STATION_LAYOUTS_BY_SCENE = {
     "default": [
-        {"id": "north-left", "label": "Marvis", "occupant": "marvis"},
-        {"id": "north-right", "label": "Thermes", "occupant": "thermes"},
-        {"id": "mid-left", "label": "待命席", "occupant": None},
-        {"id": "mid-right", "label": "Sentry", "occupant": "sentry"},
-        {"id": "south-left", "label": "File Agent", "occupant": "file", "companion": "computer"},
-        {"id": "south-right", "label": "空工位", "occupant": None},
+        {"id": "north-left", "label": "quote_vision_agent", "occupant": "quote_vision_agent"},
+        {"id": "north-right", "label": "quote_costing_agent", "occupant": "quote_costing_agent"},
+        {"id": "mid-left", "label": "quote_bom_decomposition_agent", "occupant": "quote_bom_decomposition_agent"},
+        {"id": "mid-right", "label": "quote_review_agent", "occupant": "quote_review_agent"},
+        {"id": "south-left", "label": "quote_excel_output_agent", "occupant": "quote_excel_output_agent", "companion": "quote_excel_audit_agent"},
+        {"id": "south-right", "label": "事件日志席", "occupant": None},
     ],
     "standup": [
-        {"id": "north-left", "label": "Marvis", "occupant": "marvis"},
-        {"id": "north-right", "label": "Thermes", "occupant": "thermes"},
+        {"id": "north-left", "label": "quote_vision_agent", "occupant": "quote_vision_agent"},
+        {"id": "north-right", "label": "quote_costing_agent", "occupant": "quote_costing_agent"},
         {"id": "mid-left", "label": "排队席", "occupant": None},
-        {"id": "mid-right", "label": "Sentry", "occupant": "sentry"},
-        {"id": "south-left", "label": "File Agent", "occupant": "file", "companion": "computer"},
-        {"id": "south-right", "label": "空工位", "occupant": None},
+        {"id": "mid-right", "label": "quote_review_agent", "occupant": "quote_review_agent"},
+        {"id": "south-left", "label": "quote_excel_output_agent", "occupant": "quote_excel_output_agent", "companion": "quote_excel_audit_agent"},
+        {"id": "south-right", "label": "事件日志席", "occupant": None},
     ],
     "sprint": [
-        {"id": "north-left", "label": "Marvis", "occupant": "marvis"},
-        {"id": "north-right", "label": "Thermes", "occupant": "thermes"},
-        {"id": "mid-left", "label": "识别席", "occupant": None},
-        {"id": "mid-right", "label": "审核席", "occupant": "sentry"},
-        {"id": "south-left", "label": "File Agent", "occupant": "file", "companion": "computer"},
+        {"id": "north-left", "label": "quote_vision_agent", "occupant": "quote_vision_agent"},
+        {"id": "north-right", "label": "quote_costing_agent", "occupant": "quote_costing_agent"},
+        {"id": "mid-left", "label": "quote_bom_decomposition_agent", "occupant": "quote_bom_decomposition_agent"},
+        {"id": "mid-right", "label": "quote_review_agent", "occupant": "quote_review_agent"},
+        {"id": "south-left", "label": "quote_excel_output_agent", "occupant": "quote_excel_output_agent", "companion": "quote_excel_audit_agent"},
         {"id": "south-right", "label": "冲刺席", "occupant": None},
     ],
     "incident": [
-        {"id": "north-left", "label": "Marvis", "occupant": "marvis"},
-        {"id": "north-right", "label": "Thermes", "occupant": "thermes"},
+        {"id": "north-left", "label": "quote_vision_agent", "occupant": "quote_vision_agent"},
+        {"id": "north-right", "label": "quote_costing_agent", "occupant": "quote_costing_agent"},
         {"id": "mid-left", "label": "复盘席", "occupant": None},
-        {"id": "mid-right", "label": "Sentry", "occupant": "sentry"},
-        {"id": "south-left", "label": "File Agent", "occupant": "file", "companion": "computer"},
+        {"id": "mid-right", "label": "quote_review_agent", "occupant": "quote_review_agent"},
+        {"id": "south-left", "label": "quote_excel_output_agent", "occupant": "quote_excel_output_agent", "companion": "quote_excel_audit_agent"},
         {"id": "south-right", "label": "异常席", "occupant": None},
     ],
 }
@@ -128,10 +128,10 @@ def _active_scene(counts: dict[str, int]) -> str:
 
 def _active_agent_id(counts: dict[str, int]) -> str:
     if counts["failed"] or counts["draft_ready"]:
-        return "sentry"
+        return "quote_review_agent"
     if counts["running"]:
-        return "file"
-    return "marvis"
+        return "quote_costing_agent"
+    return "quote_vision_agent"
 
 
 def _room_for_scene(scene: str) -> str:
@@ -153,18 +153,18 @@ def _build_agents(jobs: list[dict[str, Any]], counts: dict[str, int]) -> list[di
 
     return [
         {
-            "id": "marvis",
-            "name": "Marvis",
-            "initials": "M",
-            "role": "总协调 / 前台接待",
+            "id": "quote_vision_agent",
+            "name": "quote_vision_agent",
+            "initials": "QV",
+            "role": "图纸识别 Agent",
             "load": _clamp(25 + active * 12 + queued * 6, 8, 96),
             "accent": "#ff5f57",
             "monitor": "blue",
-            "summary": "负责接收报价请求、观察队列状态，并把任务分配给文件、执行和审核工位。",
+            "summary": "代码定义于 build_vision_agent，负责把图片、PDF 或附件中的可见事实提取成结构化文字。",
             "memory": [
                 f"最近任务：{latest_title}",
                 f"当前待处理 {active} 个，已完成 {counts['completed']} 个",
-                "登录权限复用现有 Quote Agent Assistant 会话",
+                "真实 Agent 名称来自代码里的 Agent(name=...) 定义",
             ],
             "activity": [
                 f"队列中 {queued} 个任务等待处理",
@@ -173,83 +173,103 @@ def _build_agents(jobs: list[dict[str, Any]], counts: dict[str, int]) -> list[di
             ],
         },
         {
-            "id": "file",
-            "name": "File Agent",
-            "initials": "F",
-            "role": "文档流 / 文件执行",
+            "id": "quote_costing_agent",
+            "name": "quote_costing_agent",
+            "initials": "QC",
+            "role": "成本计算 Agent",
             "load": _clamp(30 + running * 22 + draft_ready * 8, 10, 96),
             "accent": "#7b5cff",
             "monitor": "red",
-            "summary": "负责处理上传图纸、PDF 和图片，把输入文件转成可报价的结构化材料。",
+            "summary": "代码定义于 build_agent_system，负责品类识别、选择 costing skill、生成报价报告。",
             "memory": [
-                f"正在识别 {running} 个任务",
+                f"正在生成/计算 {running} 个任务",
                 f"初版待审核 {draft_ready} 个任务",
                 "文件名只展示给当前有权限查看任务的登录用户",
             ],
             "activity": [
-                "同步最近报价文件列表",
-                "跟踪识图、生成、Excel 输出阶段",
-                "等待后续接入更细粒度 Agent 事件日志",
+                "使用 drawing-material-analysis 和专业 costing rules",
+                "覆盖铜铝排、铜编织线、绝缘纸、大六角螺栓、钣金件",
+                "当前办公室状态来自 job 状态适配，不是运行时事件流",
             ],
         },
         {
-            "id": "computer",
-            "name": "Computer Agent",
-            "initials": "C",
-            "role": "终端执行 / 自动化",
-            "load": _clamp(20 + running * 18 + active * 5, 8, 92),
+            "id": "quote_bom_decomposition_agent",
+            "name": "quote_bom_decomposition_agent",
+            "initials": "BD",
+            "role": "BOM / 图纸拆解 Agent",
+            "load": _clamp(18 + running * 16 + active * 4, 8, 90),
             "accent": "#38c793",
             "monitor": "green",
-            "summary": "负责执行异步任务、轮询状态和把结果产物落到可下载路径。",
+            "summary": "代码定义于 bom_decomposition.py，负责拆分装配图、BOM 表和明细图关系。",
             "memory": [
-                "任务状态来自现有 jobs 表和状态文件",
-                "前端每 5 秒刷新一次办公室状态",
-                "正式部署后会沿用同一路由",
+                "主要服务于钣金/BOM 报价场景",
+                "将装配层级和子件事实整理给 Excel 输出",
+                "当前只有任务级状态，未记录每次 Agent 调用事件",
             ],
             "activity": [
                 f"运行中任务 {running} 个",
-                "保持状态接口只读，暂不开放页面控制动作",
-                "监听报价任务从 queued 到 completed 的流转",
+                "等待后续接入 office_events 后显示真实调用时间线",
+                "与 quote_excel_output_agent 共享结构化成本上下文",
             ],
         },
         {
-            "id": "thermes",
-            "name": "Thermes",
-            "initials": "T",
-            "role": "研究与检索",
+            "id": "quote_review_agent",
+            "name": "quote_review_agent",
+            "initials": "QR",
+            "role": "质量审核 Agent",
             "load": _clamp(18 + active * 7, 8, 84),
             "accent": "#f0a53a",
             "monitor": "green",
-            "summary": "负责把任务提示、报价需求和上下文压缩成办公室可快速理解的信息。",
-            "memory": [
-                "任务标题优先来自上传文件名，其次来自提示词摘要",
-                "Token 指标当前未接入真实计量",
-                "后续可接入检索、规则库和上下文复用统计",
-            ],
-            "activity": [
-                "整理任务流摘要",
-                "压缩长提示词避免右侧列表过载",
-                "等待接入真实 Token 节省数据",
-            ],
-        },
-        {
-            "id": "sentry",
-            "name": "Sentry",
-            "initials": "S",
-            "role": "风控与回归检查",
-            "load": _clamp(28 + draft_ready * 18 + failed * 20, 10, 98),
-            "accent": "#3a97ff",
-            "monitor": "red",
-            "summary": "负责盯审核状态、失败任务和需要人工介入的异常，把风险推到指挥台。",
+            "summary": "代码定义于 build_review_agent，负责判断报价报告是否可以正式输出。",
             "memory": [
                 f"失败任务 {failed} 个",
                 f"待审核初版 {draft_ready} 个",
-                "直接访问办公室页面必须先登录",
+                "审核通过/失败来自现有 review_status 字段",
             ],
             "activity": [
-                "检查失败和审核异常状态",
-                "将异常任务推送到右侧任务流",
+                "对照原始需求、图纸事实和 costing skill 规则审核",
+                "发现编造参数、口径错误或缺少待确认项时要求返工",
+                "直接访问办公室页面必须先登录",
+            ],
+        },
+        {
+            "id": "quote_excel_output_agent",
+            "name": "quote_excel_output_agent",
+            "initials": "XO",
+            "role": "Excel 输出 Agent",
+            "load": _clamp(28 + draft_ready * 18 + failed * 20, 10, 98),
+            "accent": "#3a97ff",
+            "monitor": "red",
+            "summary": "代码定义于 excel_agent.py，负责把报价结果整理成 Excel 成本拆解表 payload。",
+            "memory": [
+                "输出 cost_table_agent_payload.json",
+                "生成 sheet metal 成本模板工作簿",
+                "与 quote_excel_audit_agent 配合做表格质量检查",
+            ],
+            "activity": [
+                "跟踪 Excel 输出和下载路径",
+                "失败任务会进入异常指挥台",
                 "保持 /api/office/state 与报价历史同权限边界",
+            ],
+        },
+        {
+            "id": "quote_excel_audit_agent",
+            "name": "quote_excel_audit_agent",
+            "initials": "XA",
+            "role": "Excel 审核 Agent",
+            "load": _clamp(20 + failed * 16 + draft_ready * 8, 8, 92),
+            "accent": "#ff8f2f",
+            "monitor": "blue",
+            "summary": "代码定义于 excel_audit.py，负责审核 Excel payload 是否可以作为真实成本拆解表输出。",
+            "memory": [
+                "检查 part_number、drawing_ref、材料、重量和模板必填字段",
+                "发现缺失或逻辑错误时返回修复建议",
+                "目前办公室只展示任务级状态，未展示单次审核明细",
+            ],
+            "activity": [
+                "与 quote_excel_output_agent 同桌协作",
+                "输出 Excel 审核结论和修复提示",
+                "后续可接入真实 audit event 展示每轮审核",
             ],
         },
     ]
@@ -294,12 +314,12 @@ def _build_meeting_feed(jobs: list[dict[str, Any]], *, username: str, is_admin: 
         viewer = "管理员" if is_admin else (username or "当前用户")
         return [
             {
-                "speaker": "Marvis",
+                "speaker": "quote_costing_agent",
                 "text": f"{viewer} 的办公室已连接，但当前没有可展示的报价任务。",
                 "stamp": "刚刚",
             },
             {
-                "speaker": "Sentry",
+                "speaker": "quote_review_agent",
                 "text": "页面和状态接口都复用现有登录权限，未登录访问会被拦截。",
                 "stamp": "刚刚",
             },
@@ -309,12 +329,12 @@ def _build_meeting_feed(jobs: list[dict[str, Any]], *, username: str, is_admin: 
     for job in jobs[:4]:
         status = str(job.get("status") or "").strip()
         speaker = {
-            "queued": "Marvis",
-            "running": "File Agent",
-            "draft_ready": "Sentry",
-            "completed": "Marvis",
-            "failed": "Sentry",
-        }.get(status, "Marvis")
+            "queued": "quote_vision_agent",
+            "running": "quote_costing_agent",
+            "draft_ready": "quote_review_agent",
+            "completed": "quote_excel_output_agent",
+            "failed": "quote_review_agent",
+        }.get(status, "quote_costing_agent")
         feed.append(
             {
                 "speaker": speaker,
@@ -333,7 +353,7 @@ def _job_message(job: dict[str, Any]) -> str:
     if status == "running":
         return f"正在处理「{title}」，识图、报价生成或文件输出流程进行中。"
     if status == "draft_ready":
-        return f"「{title}」初版已生成，审核 Agent 正在复核。"
+        return f"「{title}」初版已生成，quote_review_agent 正在复核。"
     if status == "completed":
         return f"「{title}」已完成，报告和可用产物已进入历史记录。"
     if status == "failed":

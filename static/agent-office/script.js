@@ -1,266 +1,161 @@
-const DEMO_STATE = {
-  rooms: [
-    {
-      id: "main",
-      name: "主办公区",
-      tag: "Floor",
-      description: "以工位为中心的日常协作空间，能一眼看清谁在工作、谁在待命、谁在排队等指令。"
-    },
-    {
-      id: "focus",
-      name: "冲刺区",
-      tag: "Focus",
-      description: "减少打扰，让执行型 Agent 长时间占据桌面推进交付，适合快节奏连贯输出。"
-    },
-    {
-      id: "meeting",
-      name: "碰头区",
-      tag: "Sync",
-      description: "用于快速对齐、讨论下一步和拆任务，像站会一样短促但信息密度高。"
-    },
-    {
-      id: "control",
-      name: "指挥台",
-      tag: "Ops",
-      description: "当故障、超预算或优先级突变时，所有注意力会回到这里重新调度。"
-    }
-  ],
+﻿const DEMO_STATE = {
   agents: [
     {
-      id: "marvis",
-      name: "Marvis",
-      initials: "M",
-      role: "总协调 / 前台接待",
-      load: 68,
+      id: "quote_vision_agent",
+      name: "quote_vision_agent",
+      initials: "QV",
+      role: "图纸识别 Agent",
+      load: 52,
       accent: "#ff5f57",
       monitor: "blue",
-      summary: "负责看大盘、分配工作、决定哪个 Agent 先上桌，保证办公室整体节奏顺滑。",
-      memory: [
-        "记得每个 Agent 最近一次切换上下文的时间",
-        "掌握今天优先级最高的三个请求",
-        "能判断什么时候要把任务从聊天切换成文件流"
-      ],
-      activity: [
-        "把参考图风格同步给 File Agent",
-        "把高优先级请求挪到右侧任务流顶部",
-        "提醒 Thermes 控制 Token 消耗节奏"
-      ]
+      summary: "负责把图片、PDF 或附件中的可见事实提取成结构化文字。",
+      memory: ["Agent(name=\"quote_vision_agent\")", "定义来源：build_vision_agent", "输出图纸事实，不直接报价"],
+      activity: ["识别图纸、PDF、图片附件", "提取尺寸、材料、工艺和疑点", "给后续报价建议路由"]
     },
     {
-      id: "file",
-      name: "File Agent",
-      initials: "F",
-      role: "文档流 / 文件执行",
-      load: 83,
+      id: "quote_costing_agent",
+      name: "quote_costing_agent",
+      initials: "QC",
+      role: "成本计算 Agent",
+      load: 68,
       accent: "#7b5cff",
       monitor: "red",
-      summary: "擅长处理文件、产物和结构化内容，是把草图落成真正交付物的主力工位。",
-      memory: [
-        "保存最近输出过的原型和文件命名规则",
-        "知道每个页面产物在哪个目录里",
-        "记录所有可直接交付给用户的版本快照"
-      ],
-      activity: [
-        "刷新了原型页面布局和脚本",
-        "生成了一张新预览图供人工验收",
-        "准备把空间风格继续做得更像实体办公室"
-      ]
+      summary: "负责品类识别、选择 costing skill、生成报价报告。",
+      memory: ["Agent(name=\"quote_costing_agent\")", "定义来源：build_agent_system", "使用本地 costing skills"],
+      activity: ["调用铜铝排、编织线、绝缘纸、螺栓、钣金规则", "生成成本依据和待确认项", "输出报价报告"]
     },
     {
-      id: "computer",
-      name: "Computer Agent",
-      initials: "C",
-      role: "终端执行 / 自动化",
-      load: 57,
+      id: "quote_bom_decomposition_agent",
+      name: "quote_bom_decomposition_agent",
+      initials: "BD",
+      role: "BOM / 图纸拆解 Agent",
+      load: 43,
       accent: "#38c793",
       monitor: "green",
-      summary: "负责点按钮、跑本地验证、看终端输出，让抽象设计变成可确认的真实结果。",
-      memory: [
-        "记住上一次本地截图的尺寸和校验路径",
-        "知道哪些命令只需要读权限",
-        "持续跟踪页面交互是否还联动正常"
-      ],
-      activity: [
-        "用无头浏览器重新截了新版空间图",
-        "验证了切场景和选 Agent 的联动",
-        "保留了一套安全的本地验收路径"
-      ]
+      summary: "负责拆分装配图、BOM 表和明细图关系。",
+      memory: ["Agent(name=\"quote_bom_decomposition_agent\")", "定义来源：bom_decomposition.py", "主要服务钣金/BOM 报价"],
+      activity: ["拆装配层级", "合并明细图事实", "准备 Excel 行级结构"]
     },
     {
-      id: "thermes",
-      name: "Thermes",
-      initials: "T",
-      role: "研究与检索",
-      load: 49,
+      id: "quote_review_agent",
+      name: "quote_review_agent",
+      initials: "QR",
+      role: "质量审核 Agent",
+      load: 57,
       accent: "#f0a53a",
       monitor: "green",
-      summary: "负责找资料、补背景和压缩上下文，把零散信息整理成办公区可以消费的短内容。",
-      memory: [
-        "收藏了可复用的搜索关键词模板",
-        "知道哪些来源适合直接给用户看",
-        "能把长结果压成一句任务备注"
-      ],
-      activity: [
-        "整理出参考图的主要视觉特征",
-        "把展厅式布局拆成左中右三块",
-        "补了一轮更接近实景办公室的命名"
-      ]
+      summary: "负责判断报价报告是否可以正式输出。",
+      memory: ["Agent(name=\"quote_review_agent\")", "定义来源：build_review_agent", "检查编造参数和口径错误"],
+      activity: ["审核报告质量", "给出 pass/fail", "失败时生成修正要求"]
     },
     {
-      id: "sentry",
-      name: "Sentry",
-      initials: "S",
-      role: "风控与回归检查",
-      load: 74,
+      id: "quote_excel_output_agent",
+      name: "quote_excel_output_agent",
+      initials: "XO",
+      role: "Excel 输出 Agent",
+      load: 49,
       accent: "#3a97ff",
       monitor: "red",
-      summary: "盯布局风险、交互断点和视觉回归，确保每次改版后不会出现明显破相。",
-      memory: [
-        "记住最容易塌掉的是右侧面板与桌面比例",
-        "知道移动端时 desk grid 最容易挤压",
-        "持续监控哪些场景切换会让信息错位"
-      ],
-      activity: [
-        "发现上一版左侧空间被拉得太高",
-        "提醒重做为展厅式空间布局",
-        "要求重验截图和点选结果"
-      ]
+      summary: "负责把报价结果整理成 Excel 成本拆解表 payload。",
+      memory: ["Agent(name=\"quote_excel_output_agent\")", "定义来源：excel_agent.py", "输出 cost_table_agent_payload.json"],
+      activity: ["生成 Excel payload", "写入钣金模板", "准备下载产物"]
+    },
+    {
+      id: "quote_excel_audit_agent",
+      name: "quote_excel_audit_agent",
+      initials: "XA",
+      role: "Excel 审核 Agent",
+      load: 38,
+      accent: "#ff8f2f",
+      monitor: "blue",
+      summary: "负责审核 Excel payload 是否可以作为真实成本拆解表输出。",
+      memory: ["Agent(name=\"quote_excel_audit_agent\")", "定义来源：excel_audit.py", "检查模板必填字段和可追溯性"],
+      activity: ["审核 Excel 行数据", "发现缺失字段", "输出修复建议"]
     }
   ],
   stationLayoutsByScene: {
     default: [
-      { id: "north-left", label: "Marvis", occupant: "marvis" },
-      { id: "north-right", label: "空工位", occupant: null },
-      { id: "mid-left", label: "空工位", occupant: null },
-      { id: "mid-right", label: "空工位", occupant: null },
-      { id: "south-left", label: "File Agent", occupant: "file", companion: "computer" },
-      { id: "south-right", label: "空工位", occupant: null }
+      { id: "north-left", label: "quote_vision_agent", occupant: "quote_vision_agent" },
+      { id: "north-right", label: "quote_costing_agent", occupant: "quote_costing_agent" },
+      { id: "mid-left", label: "quote_bom_decomposition_agent", occupant: "quote_bom_decomposition_agent" },
+      { id: "mid-right", label: "quote_review_agent", occupant: "quote_review_agent" },
+      { id: "south-left", label: "quote_excel_output_agent", occupant: "quote_excel_output_agent", companion: "quote_excel_audit_agent" },
+      { id: "south-right", label: "事件日志席", occupant: null }
     ],
     standup: [
-      { id: "north-left", label: "Marvis", occupant: "marvis" },
-      { id: "north-right", label: "Thermes", occupant: "thermes" },
-      { id: "mid-left", label: "碰头席", occupant: null },
-      { id: "mid-right", label: "Sentry", occupant: "sentry" },
-      { id: "south-left", label: "File Agent", occupant: "file", companion: "computer" },
-      { id: "south-right", label: "空工位", occupant: null }
+      { id: "north-left", label: "quote_vision_agent", occupant: "quote_vision_agent" },
+      { id: "north-right", label: "quote_costing_agent", occupant: "quote_costing_agent" },
+      { id: "mid-left", label: "排队席", occupant: null },
+      { id: "mid-right", label: "quote_review_agent", occupant: "quote_review_agent" },
+      { id: "south-left", label: "quote_excel_output_agent", occupant: "quote_excel_output_agent", companion: "quote_excel_audit_agent" },
+      { id: "south-right", label: "事件日志席", occupant: null }
     ],
     sprint: [
-      { id: "north-left", label: "Marvis", occupant: "marvis" },
-      { id: "north-right", label: "Thermes", occupant: "thermes" },
-      { id: "mid-left", label: "空工位", occupant: null },
-      { id: "mid-right", label: "冲刺席", occupant: null },
-      { id: "south-left", label: "File Agent", occupant: "file", companion: "computer" },
-      { id: "south-right", label: "空工位", occupant: null }
+      { id: "north-left", label: "quote_vision_agent", occupant: "quote_vision_agent" },
+      { id: "north-right", label: "quote_costing_agent", occupant: "quote_costing_agent" },
+      { id: "mid-left", label: "quote_bom_decomposition_agent", occupant: "quote_bom_decomposition_agent" },
+      { id: "mid-right", label: "quote_review_agent", occupant: "quote_review_agent" },
+      { id: "south-left", label: "quote_excel_output_agent", occupant: "quote_excel_output_agent", companion: "quote_excel_audit_agent" },
+      { id: "south-right", label: "冲刺席", occupant: null }
     ],
     incident: [
-      { id: "north-left", label: "Marvis", occupant: "marvis" },
-      { id: "north-right", label: "Thermes", occupant: "thermes" },
-      { id: "mid-left", label: "空工位", occupant: null },
-      { id: "mid-right", label: "Sentry", occupant: "sentry" },
-      { id: "south-left", label: "File Agent", occupant: "file", companion: "computer" },
-      { id: "south-right", label: "故障席", occupant: null }
+      { id: "north-left", label: "quote_vision_agent", occupant: "quote_vision_agent" },
+      { id: "north-right", label: "quote_costing_agent", occupant: "quote_costing_agent" },
+      { id: "mid-left", label: "复盘席", occupant: null },
+      { id: "mid-right", label: "quote_review_agent", occupant: "quote_review_agent" },
+      { id: "south-left", label: "quote_excel_output_agent", occupant: "quote_excel_output_agent", companion: "quote_excel_audit_agent" },
+      { id: "south-right", label: "异常席", occupant: null }
     ]
   },
   meetingFeedByScene: {
     default: [
-      { speaker: "Marvis", text: "参考图已经确定方向，下一步重点是让空间更像真实办公室而不是卡片看板。", stamp: "刚刚" },
-      { speaker: "File Agent", text: "页面结构已经换成左中右布局，工位和右侧任务流正在按实景感重新组织。", stamp: "1 分钟前" },
-      { speaker: "Computer Agent", text: "截图验收会继续跟上，避免只是代码改了但真实画面不对劲。", stamp: "2 分钟前" }
+      { speaker: "quote_vision_agent", text: "我负责先把图纸和附件事实提取出来，不直接报价。", stamp: "刚刚" },
+      { speaker: "quote_costing_agent", text: "我负责根据识别事实选择 costing skill 并生成报价报告。", stamp: "1 分钟前" },
+      { speaker: "quote_review_agent", text: "我负责复核报告是否可以正式输出。", stamp: "2 分钟前" }
     ],
     standup: [
-      { speaker: "Marvis", text: "晨会开始，每个 Agent 只报一条目标和一条风险，避免站会变成长会。", stamp: "现在" },
-      { speaker: "Thermes", text: "我负责继续比对参考图，让道具和桌面比例更接近你想要的感觉。", stamp: "现在" },
-      { speaker: "Sentry", text: "我盯移动端挤压和右侧信息密度，防止新布局在小屏幕上塌掉。", stamp: "现在" }
+      { speaker: "quote_vision_agent", text: "队列里有新任务时，我先进入识图阶段。", stamp: "现在" },
+      { speaker: "quote_costing_agent", text: "待识别完成后，我会接手成本计算。", stamp: "现在" },
+      { speaker: "quote_review_agent", text: "初版报告出来后，我再复核。", stamp: "现在" }
     ],
     sprint: [
-      { speaker: "File Agent", text: "进入冲刺后，我会优先稳定桌面层级、名字标签和角色站位。", stamp: "现在" },
-      { speaker: "Computer Agent", text: "我压缩验证链路，只保留必要截图和关键点击检查。", stamp: "1 分钟前" },
-      { speaker: "Marvis", text: "非关键问题先停一停，先把空间感和参考方向做准。", stamp: "1 分钟前" }
+      { speaker: "quote_costing_agent", text: "正在推进报价生成和成本拆解。", stamp: "现在" },
+      { speaker: "quote_bom_decomposition_agent", text: "如果是 BOM 或装配图，我会拆层级。", stamp: "1 分钟前" },
+      { speaker: "quote_excel_output_agent", text: "结构化数据准备好后，我负责 Excel 输出。", stamp: "1 分钟前" }
     ],
     incident: [
-      { speaker: "Sentry", text: "故障演练已启动，如果 Token 超预算或工位任务堆积，会立即切回指挥台。", stamp: "现在" },
-      { speaker: "Marvis", text: "我已经重新排了优先级，保留与参考图最相关的任务，其余延后。", stamp: "现在" },
-      { speaker: "Thermes", text: "我会把高噪音任务剥离成备注，别让右侧列表失去可读性。", stamp: "现在" }
+      { speaker: "quote_review_agent", text: "失败或审核异常会被推到异常指挥台。", stamp: "现在" },
+      { speaker: "quote_excel_audit_agent", text: "Excel payload 有问题时我会给修复建议。", stamp: "现在" },
+      { speaker: "quote_costing_agent", text: "需要重跑时，我会按审核意见重新生成。", stamp: "现在" }
     ]
   },
   taskFeedByScene: {
     default: [
-      { title: "帮我把虚拟办公室做成参考图那种实景感", meta: "预计 Token 消耗 11.4 万", time: "17:34 05/26", status: "done" },
-      { title: "把旧版卡片式布局改成左中右展厅结构", meta: "预计 Token 消耗 6.8 万", time: "16:52 05/26", status: "done" },
-      { title: "让 Marvis 和 File Agent 真正坐进工位里", meta: "预计 Token 消耗 4.1 万", time: "进行中", status: "running" },
-      { title: "把右侧面板改成任务流而不是纯信息栏", meta: "预计 Token 消耗 3.9 万", time: "进行中", status: "running" },
-      { title: "补一个更像实体展厅的左侧摆设区", meta: "预计 Token 消耗 2.7 万", time: "15:38 05/26", status: "done" },
-      { title: "复验移动端和窄屏表现", meta: "预计 Token 消耗 2.3 万", time: "待执行", status: "blocked" }
+      { title: "quote_vision_agent 提取图纸事实", meta: "当前为办公室内置 fallback 数据", time: "刚刚", status: "running" },
+      { title: "quote_costing_agent 生成报价报告", meta: "等待识别结果或任务状态", time: "待执行", status: "queued" },
+      { title: "quote_review_agent 复核输出质量", meta: "报告初版完成后进入审核", time: "待执行", status: "queued" },
+      { title: "quote_excel_output_agent 准备成本拆解表", meta: "有结构化结果时生成 Excel", time: "待执行", status: "queued" }
     ],
     standup: [
-      { title: "晨会确认今天只做空间感、工位感、任务流三件事", meta: "预计 Token 消耗 1.2 万", time: "现在", status: "running" },
-      { title: "Thermes 对照参考图列视觉特征清单", meta: "预计 Token 消耗 3.6 万", time: "现在", status: "running" },
-      { title: "Sentry 跟踪响应式风险", meta: "预计 Token 消耗 2.1 万", time: "现在", status: "running" },
-      { title: "把不重要的小动效全部延后", meta: "预计 Token 消耗 0.8 万", time: "已同步", status: "done" }
+      { title: "quote_vision_agent 检查新上传文件", meta: "排队任务进入识图前置阶段", time: "现在", status: "running" },
+      { title: "quote_costing_agent 等待成本计算上下文", meta: "识别事实完成后接手", time: "待执行", status: "queued" },
+      { title: "quote_review_agent 监听初版状态", meta: "审核队列待命", time: "待执行", status: "queued" }
     ],
     sprint: [
-      { title: "把桌面、显示器、椅子和阴影做出层次", meta: "预计 Token 消耗 5.2 万", time: "进行中", status: "running" },
-      { title: "让 Agent 点击选中与右侧详情联动", meta: "预计 Token 消耗 2.8 万", time: "进行中", status: "running" },
-      { title: "压缩顶部控件，避免喧宾夺主", meta: "预计 Token 消耗 1.5 万", time: "14:16 05/26", status: "done" },
-      { title: "补一轮截图验收", meta: "预计 Token 消耗 1.9 万", time: "待执行", status: "blocked" }
+      { title: "quote_costing_agent 推进报价生成", meta: "运行中任务会优先显示在这里", time: "进行中", status: "running" },
+      { title: "quote_bom_decomposition_agent 拆解 BOM 层级", meta: "装配图/钣金场景启用", time: "进行中", status: "running" },
+      { title: "quote_excel_output_agent 生成 Excel payload", meta: "结构化成本表输出", time: "待执行", status: "queued" }
     ],
     incident: [
-      { title: "右侧任务流过长，先保留最关键六条", meta: "预计 Token 消耗 1.3 万", time: "告警中", status: "blocked" },
-      { title: "把中间办公区比例重新调平", meta: "预计 Token 消耗 4.4 万", time: "处理中", status: "running" },
-      { title: "Sentry 复查每个场景的占位变化", meta: "预计 Token 消耗 2.2 万", time: "处理中", status: "running" },
-      { title: "Marvis 重新排优先级并收敛工作面", meta: "预计 Token 消耗 0.9 万", time: "刚完成", status: "done" }
+      { title: "quote_review_agent 标记失败或审核异常", meta: "异常任务进入指挥台", time: "告警中", status: "blocked" },
+      { title: "quote_excel_audit_agent 生成修复建议", meta: "Excel payload 异常时启用", time: "处理中", status: "running" },
+      { title: "quote_costing_agent 等待重跑输入", meta: "根据审核意见修正", time: "待执行", status: "queued" }
     ]
-  },
-  sceneModes: {
-    default: {
-      label: "办公室巡航",
-      roomId: "main",
-      agents: 5,
-      tasks: 8,
-      decisions: 8,
-      tokensSpent: "0",
-      budget: "/1000万",
-      tokensSaved: "0",
-      savedHint: "复用率持续提升"
-    },
-    standup: {
-      label: "晨会模式",
-      roomId: "meeting",
-      agents: 5,
-      tasks: 4,
-      decisions: 10,
-      tokensSpent: "12.6万",
-      budget: "/1000万",
-      tokensSaved: "2.3万",
-      savedHint: "摘要复用提升 13%"
-    },
-    sprint: {
-      label: "冲刺模式",
-      roomId: "focus",
-      agents: 5,
-      tasks: 6,
-      decisions: 5,
-      tokensSpent: "32.7万",
-      budget: "/1000万",
-      tokensSaved: "5.8万",
-      savedHint: "上下文压缩生效"
-    },
-    incident: {
-      label: "故障演练",
-      roomId: "control",
-      agents: 5,
-      tasks: 4,
-      decisions: 12,
-      tokensSpent: "48.1万",
-      budget: "/1000万",
-      tokensSaved: "4.4万",
-      savedHint: "高噪音任务已隔离"
-    }
   },
   defaults: {
     activeScene: "default",
     activeRoomId: "main",
-    activeAgentId: "marvis"
+    activeAgentId: "quote_vision_agent"
   }
 };
 
@@ -901,3 +796,4 @@ applyData(cloneDeep(DEMO_STATE), DEMO_STATE.defaults);
 startDataSource();
 updateClock();
 setInterval(updateClock, 1000);
+
