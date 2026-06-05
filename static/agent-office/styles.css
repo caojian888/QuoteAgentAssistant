@@ -792,17 +792,18 @@ body::before {
 
 .agent-name-tag {
   left: 50%;
-  top: -20px;
+  right: auto;
+  bottom: -22px;
   z-index: 6;
-  max-width: 118px;
-  min-height: 20px;
+  max-width: 132px;
+  min-height: 22px;
   transform: translateX(-50%);
   border: 1px solid rgba(255, 255, 255, 0.74);
-  border-radius: 999px;
-  padding: 3px 8px;
-  background: rgba(18, 26, 46, 0.86);
+  border-radius: 8px;
+  padding: 4px 8px;
+  background: var(--agent-accent, #3a97ff);
   color: #fff;
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   font-weight: 800;
   line-height: 1.2;
   letter-spacing: 0.01em;
@@ -814,13 +815,12 @@ body::before {
 }
 
 .agent-figure.active .agent-name-tag {
-  background: var(--agent-accent, #3a97ff);
   box-shadow: 0 0 0 5px rgba(58, 151, 255, 0.14), 0 12px 22px rgba(18, 26, 46, 0.2);
 }
 
 .agent-figure.standing .agent-name-tag {
-  top: -18px;
-  max-width: 126px;
+  bottom: -24px;
+  max-width: 138px;
 }
 
 .agent-head {
