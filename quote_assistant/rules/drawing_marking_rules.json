@@ -1,0 +1,33 @@
+{
+  "title": "Drawing Marking Rules",
+  "sections": [
+    {
+      "name": "Detection order",
+      "rules": [
+        "First determine whether the drawing has a BOM, parts list, item table, balloon numbers, leader lines, arrows, exploded views, detail views, or flat patterns.",
+        "If a BOM or parts list exists, bind each quote row by part number first, then by normalized name/specification, then by material and quantity.",
+        "A quote row number is not the same as a BOM item number. Always read the BOM item number from the parts list.",
+        "If a child BOM item also has a standalone detail drawing in the upload, keep the child row in the assembly hierarchy and use the standalone drawing as stronger visual evidence for that child."
+      ]
+    },
+    {
+      "name": "BOM to callout linking",
+      "rules": [
+        "For a bound BOM item, search the drawing for the matching numbered callout bubble.",
+        "Follow the leader line from the bubble boundary to its endpoint or arrowhead.",
+        "The image target is the physical object under the arrowhead or leader endpoint, not the bubble and not the leader line itself.",
+        "If nearby leader lines cross, keep the original bubble identity and do not switch to a neighboring item number.",
+        "When the same item can be located both in an assembly callout and in a standalone detail drawing, prefer the smallest standalone detail view if it shows the specific part more clearly."
+      ]
+    },
+    {
+      "name": "Fallback order",
+      "rules": [
+        "Prefer arrow-target physical object crops.",
+        "If no arrow target is visible, use a local detail view that isolates the same item.",
+        "If no graphic evidence exists, crop the exact BOM row as evidence.",
+        "If only notes or title blocks exist, return bbox null with low confidence."
+      ]
+    }
+  ]
+}

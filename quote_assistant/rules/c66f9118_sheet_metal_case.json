@@ -1,0 +1,38 @@
+{
+  "title": "Validated Case: c66f9118 Sheet-Metal Multi-PDF Assembly",
+  "sections": [
+    {
+      "name": "Case summary",
+      "rules": [
+        "This case involved four uploaded PDFs: 29110988_R1, 29275302_R00, 29275303_R1, and 29275304_R01.",
+        "29275302 and 29275304 appeared both as standalone/detail drawings and as child BOM items in the 29275303 assembly. The correct Excel result keeps them as child rows and merges standalone drawing facts into those child rows instead of duplicating top-level quote rows.",
+        "If a detail drawing provides clearer geometry than an assembly callout, use it for the child row image while preserving the assembly hierarchy."
+      ]
+    },
+    {
+      "name": "29110988 drawing row image lessons",
+      "rules": [
+        "For the 30201000077 assembly row, use the bottom-left overall isometric assembly view, not the title block, revision area, notes, or empty page area.",
+        "For BOM item 1 / part 29110986, follow callout bubble 1 to the long curved perforated profile body. Crop the target body, not the whole assembly and not blank whitespace below it.",
+        "For BOM item 2 / part 29111231, follow callout bubble 2 to the saddle interface bracket body. The crop must include the complete visible target body and right arc/side edge; too-tight crops that cut off the part are invalid.",
+        "A crop that includes a little neighboring context can be acceptable when needed to preserve the complete target body and leader relationship."
+      ]
+    },
+    {
+      "name": "29275302 and 29275304 detail drawing lessons",
+      "rules": [
+        "For part 29275302, prefer the standalone 29275302_R00 isometric part view over the 29275303 assembly callout when illustrating the child row.",
+        "For part 29275304, prefer the standalone 29275304_R01 isometric part view over the 29275303 assembly callout when illustrating the child row.",
+        "Do not crop the lower title block, technical notes, watermark, drawing border, or empty page area when an isometric part view is visible."
+      ]
+    },
+    {
+      "name": "Validation checks",
+      "rules": [
+        "Before accepting a row image crop, verify that the bbox contains visible black drawing geometry for the intended target row.",
+        "Reject crops that are mostly blank, mostly title block/table, mostly notes, or show only a partial target when a fuller view is available.",
+        "For callout-based rows, verify the target is the physical object at the leader/arrow endpoint, not the callout bubble position."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "dependencies": [
+    "."
+  ],
+  "graphs": {
+    "quote_agent": "./quote_assistant/langgraph_workflow.py:graph"
+  },
+  "env": ".env"
+}

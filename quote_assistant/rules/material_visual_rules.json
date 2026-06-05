@@ -1,0 +1,23 @@
+{
+  "title": "Material Visual Rules",
+  "sections": [
+    {
+      "name": "Standard purchased parts",
+      "rules": [
+        "Screws: crop the screw body at the item callout target; avoid adjacent washers unless the washer is the requested row.",
+        "Nuts: crop the nut body at the item callout target; avoid the entire fastener stack.",
+        "Washers: crop the ring/washer body at the item callout target; do not reuse the screw crop.",
+        "Rivet nuts: crop the visible rivet nut cylinder or ring, preferably from an isometric or exploded view.",
+        "O-rings: crop the marked O-ring target from the item callout. If represented only as a small dot or ring in an exploded view, crop that target with minimal surrounding part context."
+      ]
+    },
+    {
+      "name": "Sheet metal and assemblies",
+      "rules": [
+        "Sheet-metal child rows may use the smallest isometric body, flat pattern, or main part view that identifies the child part.",
+        "Assembly rows may use an exploded or overall geometry view, but child rows should not reuse the assembly crop.",
+        "Seal/profile rows should crop the actual profile body or edge-protection strip, not notes about bonding or installation."
+      ]
+    }
+  ]
+}

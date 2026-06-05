@@ -1,0 +1,14 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY quote_assistant ./quote_assistant
+COPY skills ./skills
+
+ENV QUOTE_DATA_DIR=/app/data
+EXPOSE 8000
+
+CMD ["python", "-m", "quote_assistant", "serve", "--host", "0.0.0.0", "--port", "8000"]
