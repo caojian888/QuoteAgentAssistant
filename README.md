@@ -1,53 +1,51 @@
 # Quote Agent Assistant
 
-Quote Agent Assistant is a multi-agent drawing quotation assistant. It routes uploaded
-drawings or text requirements to costing skills, generates a quotation report, and runs
-an automated review loop before returning final output.
+Quote Agent Assistant 是一个多智能体图纸报价助手。它会将上传的图纸或文本需求
+路由到对应的成本核算技能，生成报价报告，并在返回最终结果前执行自动化审核闭环。
 
-## What It Supports
+## 支持内容
 
-- Browser upload page for drawings, PDFs, and images.
-- Synchronous quotation API: `POST /api/quote`.
-- Asynchronous job API: `POST /api/jobs`, then poll `GET /api/jobs/{job_id}`.
-- Local CLI quotation and folder watch mode.
-- Separate vision, work, and review model configuration.
-- Excel output, row-image evidence, audit records, login/history, and optional RAG.
+- 用于上传图纸、PDF 和图片的浏览器页面。
+- 同步报价 API：`POST /api/quote`。
+- 异步任务 API：`POST /api/jobs`，然后轮询 `GET /api/jobs/{job_id}`。
+- 本地 CLI 报价与文件夹监听模式。
+- 独立的 vision、work 和 review 模型配置。
+- Excel 输出、行图像证据、审核记录、登录/历史，以及可选 RAG。
 
-## Agent Flow
-
-```text
-Quote controller agent
-├─ Drawing material routing agent
-├─ Copper/aluminum busbar costing agent
-├─ Copper braided wire costing agent
-├─ Insulation paper costing agent
-├─ Large hex bolt costing agent
-├─ Sheet metal costing agent
-└─ Quotation review agent
-```
-
-## Project Layout
+## 智能体流程
 
 ```text
-quote_assistant/         Core application code, API handlers, agents, and workflows
-templates/               HTML templates used by the web interface
-static/agent-office/     Frontend assets for the browser upload experience
-skills/                  Costing skill prompts and routing references
-requirements.txt         Runtime dependency list
-DEPLOY.md                Deployment notes and environment-specific path guidance
+报价控制智能体
+├─ 图纸物料路由智能体
+├─ 铜/铝母排成本核算智能体
+├─ 铜编织线成本核算智能体
+├─ 绝缘纸成本核算智能体
+├─ 大六角螺栓成本核算智能体
+├─ 钣金件成本核算智能体
+└─ 报价审核智能体
 ```
 
-## Setup
+## 项目结构
 
-Create a virtual environment, install dependencies, and create a local `.env` from
-`.env.example`.
+```text
+quote_assistant/         核心应用代码、API 处理器、智能体与工作流
+templates/               Web 界面使用的 HTML 模板
+static/agent-office/     浏览器上传页面使用的前端资源
+skills/                  成本核算技能提示词与路由参考
+requirements.txt         运行时依赖清单
+DEPLOY.md                部署说明与环境路径指引
+```
+
+## 环境准备
+
+先创建虚拟环境、安装依赖，并根据 `.env.example` 生成本地 `.env`。
 
 ```text
 python -m venv .venv
 python -m pip install -r requirements.txt
 ```
 
-Fill in at least one model API key in `.env`. The most important settings are:
+在 `.env` 中至少填写一组模型 API key。最重要的配置如下：
 
 ```text
 OPENAI_API_KEY=your-openai-compatible-key
@@ -60,64 +58,64 @@ QUOTE_WORK_API_KEY=your-work-model-key
 QUOTE_REVIEW_MODEL=gpt-5.5
 ```
 
-## Runtime Paths
+## 运行路径
 
-The application loads runtime configuration in this order:
+应用会按以下顺序加载运行配置：
 
 ```text
-1. QUOTE_ENV_FILE, when explicitly set
-2. Production env file, when present
-3. Project-root .env for local development
+1. 显式设置的 QUOTE_ENV_FILE
+2. 存在时使用的生产环境 env 文件
+3. 项目根目录下供本地开发使用的 .env
 ```
 
-`QUOTE_DATA_DIR`, `QUOTE_INBOX_DIR`, and `QUOTE_OUTBOX_DIR` may be absolute paths or
-relative paths. Relative paths are always resolved from the project root, not from the
-directory used to start the process.
+`QUOTE_DATA_DIR`、`QUOTE_INBOX_DIR` 和 `QUOTE_OUTBOX_DIR` 可以使用绝对路径，
+也可以使用相对路径。相对路径始终以项目根目录为基准解析，而不是以启动进程时所在的
+目录为基准。
 
-Server-specific paths and migration steps are documented in `DEPLOY.md`.
+服务端专用路径和迁移步骤记录在 `DEPLOY.md` 中。
 
-## Run The Web Service
+## 启动 Web 服务
 
 ```text
 python -m quote_assistant serve --host 0.0.0.0 --port 8000
 ```
 
-Open:
+打开：
 
 ```text
 http://server-address:8000/
 ```
 
-## Run A Manual Quote
+## 手动执行报价
 
 ```text
 python -m quote_assistant quote "识别图纸品类并生成报价报告，缺少参数列为待确认。" --file path/to/drawing.pdf
 ```
 
-Add automatic audit details to the report:
+如需在报告中加入自动审核详情：
 
 ```text
 python -m quote_assistant quote "识别图纸品类并生成报价报告。" --file path/to/drawing.png --audit
 ```
 
-## Watch A Folder
+## 监听文件夹
 
 ```text
 python -m quote_assistant watch
 ```
 
-By default, watch mode reads `QUOTE_INBOX_DIR` and writes `QUOTE_OUTBOX_DIR`; if those
-are not configured, it uses project-root `inbox` and `outbox`.
+默认情况下，监听模式会读取 `QUOTE_INBOX_DIR` 并写入 `QUOTE_OUTBOX_DIR`；如果
+没有配置这两个变量，则会使用项目根目录下的 `inbox` 和 `outbox`。
 
 ## API
 
-Synchronous:
+同步接口：
 
 ```text
 POST /api/quote
 ```
 
-Asynchronous:
+异步接口：
 
 ```text
 POST /api/jobs
@@ -127,9 +125,9 @@ GET /api/jobs/{job_id}/excel
 GET /api/jobs/{job_id}/assets
 ```
 
-## Notes
+## 注意事项
 
-- Do not commit `.env`, `data`, `inbox`, `outbox`, uploaded drawings, generated Excel
-  files, or private keys.
-- Production deployments should keep code, configuration, and runtime data separated.
-- High-value quotations should still include human review before customer delivery.
+- 不要提交 `.env`、`data`、`inbox`、`outbox`、上传的图纸、生成的 Excel 文件，
+  以及私钥。
+- 生产环境部署应将代码、配置和运行数据分离。
+- 高价值报价在交付客户前仍应保留人工复核。
