@@ -66,6 +66,41 @@ STATION_LAYOUTS_BY_SCENE = {
     ],
 }
 
+IDLE_STATION_LAYOUTS_BY_SCENE = {
+    "default": [
+        {"id": "north-left", "label": "quote_vision_agent", "occupant": "quote_vision_agent"},
+        {"id": "north-right", "label": "quote_costing_agent", "occupant": "quote_costing_agent"},
+        {"id": "mid-left", "label": "quote_bom_decomposition_agent", "occupant": "quote_bom_decomposition_agent"},
+        {"id": "mid-right", "label": "quote_review_agent", "occupant": "quote_review_agent"},
+        {"id": "south-left", "label": "quote_excel_output_agent", "occupant": "quote_excel_output_agent"},
+        {"id": "south-right", "label": "quote_excel_audit_agent", "occupant": "quote_excel_audit_agent"},
+    ],
+    "standup": [
+        {"id": "north-left", "label": "quote_vision_agent", "occupant": "quote_vision_agent"},
+        {"id": "north-right", "label": "quote_costing_agent", "occupant": "quote_costing_agent"},
+        {"id": "mid-left", "label": "quote_bom_decomposition_agent", "occupant": "quote_bom_decomposition_agent"},
+        {"id": "mid-right", "label": "quote_review_agent", "occupant": "quote_review_agent"},
+        {"id": "south-left", "label": "quote_excel_output_agent", "occupant": "quote_excel_output_agent"},
+        {"id": "south-right", "label": "quote_excel_audit_agent", "occupant": "quote_excel_audit_agent"},
+    ],
+    "sprint": [
+        {"id": "north-left", "label": "quote_vision_agent", "occupant": "quote_vision_agent"},
+        {"id": "north-right", "label": "quote_costing_agent", "occupant": "quote_costing_agent"},
+        {"id": "mid-left", "label": "quote_bom_decomposition_agent", "occupant": "quote_bom_decomposition_agent"},
+        {"id": "mid-right", "label": "quote_review_agent", "occupant": "quote_review_agent"},
+        {"id": "south-left", "label": "quote_excel_output_agent", "occupant": "quote_excel_output_agent"},
+        {"id": "south-right", "label": "quote_excel_audit_agent", "occupant": "quote_excel_audit_agent"},
+    ],
+    "incident": [
+        {"id": "north-left", "label": "quote_vision_agent", "occupant": "quote_vision_agent"},
+        {"id": "north-right", "label": "quote_costing_agent", "occupant": "quote_costing_agent"},
+        {"id": "mid-left", "label": "quote_bom_decomposition_agent", "occupant": "quote_bom_decomposition_agent"},
+        {"id": "mid-right", "label": "quote_review_agent", "occupant": "quote_review_agent"},
+        {"id": "south-left", "label": "quote_excel_output_agent", "occupant": "quote_excel_output_agent"},
+        {"id": "south-right", "label": "quote_excel_audit_agent", "occupant": "quote_excel_audit_agent"},
+    ],
+}
+
 STATUS_TEXT = {
     "queued": "排队中",
     "running": "识别中",
@@ -98,6 +133,7 @@ def build_office_state(
     active_scene = _active_scene(counts)
     active_agent_id = _active_agent_id(counts, recent_events)
     active_room_id = _room_for_scene(active_scene)
+    station_layouts = _station_layouts(counts)
     task_feed = _build_task_feed(jobs, events_by_job)
     meeting_feed = _build_meeting_feed(jobs, username=username, is_admin=is_admin, recent_events=recent_events)
     scene_modes = _build_scene_modes(counts, active_scene, recent_events)
@@ -110,7 +146,7 @@ def build_office_state(
         },
         "rooms": ROOMS,
         "agents": _build_agents(jobs, counts, recent_events),
-        "stationLayoutsByScene": STATION_LAYOUTS_BY_SCENE,
+        "stationLayoutsByScene": station_layouts,
         "meetingFeedByScene": {scene: meeting_feed for scene in ["default", "standup", "sprint", "incident"]},
         "taskFeedByScene": {scene: task_feed for scene in ["default", "standup", "sprint", "incident"]},
         "sceneModes": scene_modes,
@@ -136,6 +172,12 @@ def _active_scene(counts: dict[str, int]) -> str:
     if counts["queued"]:
         return "standup"
     return "default"
+
+
+def _station_layouts(counts: dict[str, int]) -> dict[str, list[dict[str, Any]]]:
+    if counts["active"] == 0:
+        return IDLE_STATION_LAYOUTS_BY_SCENE
+    return STATION_LAYOUTS_BY_SCENE
 
 
 def _active_agent_id(counts: dict[str, int], recent_events: list[dict[str, Any]]) -> str:
