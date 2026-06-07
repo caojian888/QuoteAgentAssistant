@@ -26,6 +26,17 @@ Quote controller agent
 └─ Quotation review agent
 ```
 
+## Project Layout
+
+```text
+quote_assistant/         Core application code, API handlers, agents, and workflows
+templates/               HTML templates used by the web interface
+static/agent-office/     Frontend assets for the browser upload experience
+skills/                  Costing skill prompts and routing references
+requirements.txt         Runtime dependency list
+DEPLOY.md                Deployment notes and environment-specific path guidance
+```
+
 ## Setup
 
 Create a virtual environment, install dependencies, and create a local `.env` from
