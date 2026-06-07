@@ -73,38 +73,110 @@
       activity: ["审核 Excel 行数据", "发现缺失字段", "输出修复建议"]
     }
   ],
+  rooms: [
+    {
+      id: "main",
+      name: "主办公区",
+      tag: "Floor",
+      description: "报价 Agent 的日常协作空间，展示当前任务、排队状态和最近交付节奏。"
+    },
+    {
+      id: "focus",
+      name: "冲刺区",
+      tag: "Focus",
+      description: "当报价任务正在识别、生成或审核时，执行型 Agent 会集中在这里推进交付。"
+    },
+    {
+      id: "meeting",
+      name: "碰头区",
+      tag: "Sync",
+      description: "用于快速对齐任务队列、文件输入和审核状态，方便登录用户看清当前节奏。"
+    },
+    {
+      id: "control",
+      name: "指挥台",
+      tag: "Ops",
+      description: "当任务失败、审核异常或需要人工介入时，办公室会切到这里提示风险。"
+    }
+  ],
+  sceneModes: {
+    default: {
+      label: "办公室巡航",
+      roomId: "main",
+      agents: 6,
+      tasks: 0,
+      decisions: 0,
+      tokensSpent: "待接入",
+      budget: "",
+      tokensSaved: "office_events",
+      savedHint: "当前指标来自每个 job 目录内的 office_events.jsonl"
+    },
+    standup: {
+      label: "队列碰头",
+      roomId: "meeting",
+      agents: 6,
+      tasks: 0,
+      decisions: 0,
+      tokensSpent: "待接入",
+      budget: "",
+      tokensSaved: "office_events",
+      savedHint: "当前指标来自每个 job 目录内的 office_events.jsonl"
+    },
+    sprint: {
+      label: "报价冲刺",
+      roomId: "focus",
+      agents: 6,
+      tasks: 0,
+      decisions: 0,
+      tokensSpent: "待接入",
+      budget: "",
+      tokensSaved: "office_events",
+      savedHint: "当前指标来自每个 job 目录内的 office_events.jsonl"
+    },
+    incident: {
+      label: "异常指挥台",
+      roomId: "control",
+      agents: 6,
+      tasks: 0,
+      decisions: 0,
+      tokensSpent: "待接入",
+      budget: "",
+      tokensSaved: "office_events",
+      savedHint: "当前指标来自每个 job 目录内的 office_events.jsonl"
+    }
+  },
   stationLayoutsByScene: {
     default: [
       { id: "north-left", label: "quote_vision_agent", occupant: "quote_vision_agent" },
       { id: "north-right", label: "quote_costing_agent", occupant: "quote_costing_agent" },
       { id: "mid-left", label: "quote_bom_decomposition_agent", occupant: "quote_bom_decomposition_agent" },
       { id: "mid-right", label: "quote_review_agent", occupant: "quote_review_agent" },
-      { id: "south-left", label: "quote_excel_output_agent", occupant: "quote_excel_output_agent", companion: "quote_excel_audit_agent" },
-      { id: "south-right", label: "事件日志席", occupant: null }
+      { id: "south-left", label: "quote_excel_output_agent", occupant: "quote_excel_output_agent" },
+      { id: "south-right", label: "quote_excel_audit_agent", occupant: "quote_excel_audit_agent" }
     ],
     standup: [
       { id: "north-left", label: "quote_vision_agent", occupant: "quote_vision_agent" },
       { id: "north-right", label: "quote_costing_agent", occupant: "quote_costing_agent" },
-      { id: "mid-left", label: "排队席", occupant: null },
+      { id: "mid-left", label: "quote_bom_decomposition_agent", occupant: "quote_bom_decomposition_agent" },
       { id: "mid-right", label: "quote_review_agent", occupant: "quote_review_agent" },
-      { id: "south-left", label: "quote_excel_output_agent", occupant: "quote_excel_output_agent", companion: "quote_excel_audit_agent" },
-      { id: "south-right", label: "事件日志席", occupant: null }
+      { id: "south-left", label: "quote_excel_output_agent", occupant: "quote_excel_output_agent" },
+      { id: "south-right", label: "quote_excel_audit_agent", occupant: "quote_excel_audit_agent" }
     ],
     sprint: [
       { id: "north-left", label: "quote_vision_agent", occupant: "quote_vision_agent" },
       { id: "north-right", label: "quote_costing_agent", occupant: "quote_costing_agent" },
       { id: "mid-left", label: "quote_bom_decomposition_agent", occupant: "quote_bom_decomposition_agent" },
       { id: "mid-right", label: "quote_review_agent", occupant: "quote_review_agent" },
-      { id: "south-left", label: "quote_excel_output_agent", occupant: "quote_excel_output_agent", companion: "quote_excel_audit_agent" },
-      { id: "south-right", label: "冲刺席", occupant: null }
+      { id: "south-left", label: "quote_excel_output_agent", occupant: "quote_excel_output_agent" },
+      { id: "south-right", label: "quote_excel_audit_agent", occupant: "quote_excel_audit_agent" }
     ],
     incident: [
       { id: "north-left", label: "quote_vision_agent", occupant: "quote_vision_agent" },
       { id: "north-right", label: "quote_costing_agent", occupant: "quote_costing_agent" },
-      { id: "mid-left", label: "复盘席", occupant: null },
+      { id: "mid-left", label: "quote_bom_decomposition_agent", occupant: "quote_bom_decomposition_agent" },
       { id: "mid-right", label: "quote_review_agent", occupant: "quote_review_agent" },
-      { id: "south-left", label: "quote_excel_output_agent", occupant: "quote_excel_output_agent", companion: "quote_excel_audit_agent" },
-      { id: "south-right", label: "异常席", occupant: null }
+      { id: "south-left", label: "quote_excel_output_agent", occupant: "quote_excel_output_agent" },
+      { id: "south-right", label: "quote_excel_audit_agent", occupant: "quote_excel_audit_agent" }
     ]
   },
   meetingFeedByScene: {
@@ -796,4 +868,3 @@ applyData(cloneDeep(DEMO_STATE), DEMO_STATE.defaults);
 startDataSource();
 updateClock();
 setInterval(updateClock, 1000);
-

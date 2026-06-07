@@ -24,10 +24,10 @@
 
         <div id="data-source-chip" class="status-chip source-chip is-demo">
           <span class="dot"></span>
-          <span id="data-source-label">Demo 数据</span>
+          <span id="data-source-label">本地待命</span>
         </div>
 
-        <p id="sync-note" class="clock sync-note">未连接</p>
+        <p id="sync-note" class="clock sync-note">等待同步</p>
         <a class="office-return-link" href="/">返回报价台</a>
         <p id="clock" class="clock" aria-live="polite"></p>
       </div>
@@ -103,7 +103,128 @@
 
         <div id="office-floor" class="office-floor">
           <div class="floor-grid"></div>
-          <div id="desk-grid" class="desk-grid"></div>
+          <div id="desk-grid" class="desk-grid">
+            <article class="desk-slot occupied active">
+              <div class="desk-set">
+                <span class="desk-shadow"></span>
+                <span class="monitor blue"></span>
+                <span class="desk-top"></span>
+                <span class="desk-leg left"></span>
+                <span class="desk-leg right"></span>
+                <span class="chair"></span>
+                <button class="agent-figure seated active" aria-label="quote_vision_agent 待命中" style="--agent-accent:#ff5f57;">
+                  <span class="agent-name-tag">quote_vision_agent</span>
+                  <span class="agent-head"></span>
+                  <span class="agent-arm left"></span>
+                  <span class="agent-arm right"></span>
+                  <span class="agent-torso"><span class="agent-panel"></span></span>
+                  <span class="agent-leg left"></span>
+                  <span class="agent-leg right"></span>
+                </button>
+              </div>
+              <span class="desk-caption">图纸识别 Agent</span>
+            </article>
+            <article class="desk-slot occupied">
+              <div class="desk-set">
+                <span class="desk-shadow"></span>
+                <span class="monitor red"></span>
+                <span class="desk-top"></span>
+                <span class="desk-leg left"></span>
+                <span class="desk-leg right"></span>
+                <span class="chair"></span>
+                <button class="agent-figure seated" aria-label="quote_costing_agent 待命中" style="--agent-accent:#7b5cff;">
+                  <span class="agent-name-tag">quote_costing_agent</span>
+                  <span class="agent-head"></span>
+                  <span class="agent-arm left"></span>
+                  <span class="agent-arm right"></span>
+                  <span class="agent-torso"><span class="agent-panel"></span></span>
+                  <span class="agent-leg left"></span>
+                  <span class="agent-leg right"></span>
+                </button>
+              </div>
+              <span class="desk-caption">成本计算 Agent</span>
+            </article>
+            <article class="desk-slot occupied">
+              <div class="desk-set">
+                <span class="desk-shadow"></span>
+                <span class="monitor green"></span>
+                <span class="desk-top"></span>
+                <span class="desk-leg left"></span>
+                <span class="desk-leg right"></span>
+                <span class="chair"></span>
+                <button class="agent-figure seated" aria-label="quote_bom_decomposition_agent 待命中" style="--agent-accent:#38c793;">
+                  <span class="agent-name-tag">quote_bom_decomposition_agent</span>
+                  <span class="agent-head"></span>
+                  <span class="agent-arm left"></span>
+                  <span class="agent-arm right"></span>
+                  <span class="agent-torso"><span class="agent-panel"></span></span>
+                  <span class="agent-leg left"></span>
+                  <span class="agent-leg right"></span>
+                </button>
+              </div>
+              <span class="desk-caption">BOM / 图纸拆解 Agent</span>
+            </article>
+            <article class="desk-slot occupied">
+              <div class="desk-set">
+                <span class="desk-shadow"></span>
+                <span class="monitor green"></span>
+                <span class="desk-top"></span>
+                <span class="desk-leg left"></span>
+                <span class="desk-leg right"></span>
+                <span class="chair"></span>
+                <button class="agent-figure seated" aria-label="quote_review_agent 待命中" style="--agent-accent:#f0a53a;">
+                  <span class="agent-name-tag">quote_review_agent</span>
+                  <span class="agent-head"></span>
+                  <span class="agent-arm left"></span>
+                  <span class="agent-arm right"></span>
+                  <span class="agent-torso"><span class="agent-panel"></span></span>
+                  <span class="agent-leg left"></span>
+                  <span class="agent-leg right"></span>
+                </button>
+              </div>
+              <span class="desk-caption">质量审核 Agent</span>
+            </article>
+            <article class="desk-slot occupied">
+              <div class="desk-set">
+                <span class="desk-shadow"></span>
+                <span class="monitor red"></span>
+                <span class="desk-top"></span>
+                <span class="desk-leg left"></span>
+                <span class="desk-leg right"></span>
+                <span class="chair"></span>
+                <button class="agent-figure seated" aria-label="quote_excel_output_agent 待命中" style="--agent-accent:#3a97ff;">
+                  <span class="agent-name-tag">quote_excel_output_agent</span>
+                  <span class="agent-head"></span>
+                  <span class="agent-arm left"></span>
+                  <span class="agent-arm right"></span>
+                  <span class="agent-torso"><span class="agent-panel"></span></span>
+                  <span class="agent-leg left"></span>
+                  <span class="agent-leg right"></span>
+                </button>
+              </div>
+              <span class="desk-caption">Excel 输出 Agent</span>
+            </article>
+            <article class="desk-slot occupied">
+              <div class="desk-set">
+                <span class="desk-shadow"></span>
+                <span class="monitor blue"></span>
+                <span class="desk-top"></span>
+                <span class="desk-leg left"></span>
+                <span class="desk-leg right"></span>
+                <span class="chair"></span>
+                <button class="agent-figure seated" aria-label="quote_excel_audit_agent 待命中" style="--agent-accent:#ff8f2f;">
+                  <span class="agent-name-tag">quote_excel_audit_agent</span>
+                  <span class="agent-head"></span>
+                  <span class="agent-arm left"></span>
+                  <span class="agent-arm right"></span>
+                  <span class="agent-torso"><span class="agent-panel"></span></span>
+                  <span class="agent-leg left"></span>
+                  <span class="agent-leg right"></span>
+                </button>
+              </div>
+              <span class="desk-caption">Excel 审核 Agent</span>
+            </article>
+          </div>
         </div>
 
         <section class="meeting-dock">
