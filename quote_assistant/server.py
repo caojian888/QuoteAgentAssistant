@@ -72,6 +72,7 @@ from .feishu_bot import (
     send_feishu_report_messages,
     send_feishu_text,
 )
+from .report_delivery import render_markdown_report_pdf
 from .model_config import build_model_config
 from .office_events import bind_office_event_context, log_office_event, read_office_events, reset_office_event_context
 from .office_state import build_office_state
@@ -276,6 +277,10 @@ def excel_payload_path(job_id: str) -> Path:
 
 def excel_audit_path(job_id: str) -> Path:
     return job_dir(job_id) / "cost_table_audit.json"
+
+
+def report_pdf_path(job_id: str) -> Path:
+    return job_dir(job_id) / "quote_report.pdf"
 
 
 def asset_manifest_path(job_id: str) -> Path:
@@ -1146,6 +1151,30 @@ async def run_job_langgraph_with_feishu_notification(
                 return
 
             await send_feishu_report_messages(receive_id, latest.job_id, report_text, receive_id_type)
+            pdf_path = report_pdf_path(latest.job_id)
+            if report_text.strip():
+                try:
+                    render_markdown_report_pdf(
+                        report_text,
+                        pdf_path,
+                        title=f"报价报告 {latest.job_id[:8]}",
+                    )
+                    await send_feishu_file(receive_id, pdf_path, receive_id_type=receive_id_type)
+                except Exception:
+                    logger.exception("feishu pdf report delivery failed job_id=%s", record.job_id)
+                    fallback_base_url = base_url or os.getenv("QUOTE_PUBLIC_BASE_URL", "").strip() or ""
+                    if fallback_base_url:
+                        await send_feishu_text(
+                            receive_id,
+                            f"PDF 报告发送到飞书失败，可先用备用链接查看完整报告：{fallback_base_url.rstrip('/')}/jobs/{latest.job_id}/report",
+                            receive_id_type=receive_id_type,
+                        )
+                    else:
+                        await send_feishu_text(
+                            receive_id,
+                            "PDF 报告发送到飞书失败，请联系管理员检查 PDF 生成依赖或飞书文件上传权限。",
+                            receive_id_type=receive_id_type,
+                        )
             workbook_path = excel_path(latest.job_id)
             if workbook_path.exists():
                 try:

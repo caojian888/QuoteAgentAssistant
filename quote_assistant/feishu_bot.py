@@ -16,6 +16,7 @@ from fastapi import HTTPException
 
 from .db import db_enabled, find_or_create_oauth_user
 from .feishu_auth import feishu_app_id, feishu_openapi_base_url, get_app_access_token
+from .report_delivery import markdown_to_feishu_post_lines, split_feishu_post_lines
 
 
 @dataclass
@@ -497,6 +498,44 @@ async def send_feishu_text(receive_id: str, text: str, receive_id_type: str = "c
             raise RuntimeError(str(data.get("msg") or data.get("message") or "Feishu send message failed."))
 
 
+async def send_feishu_post(
+    receive_id: str,
+    title: str,
+    content_lines: list[list[dict[str, Any]]],
+    receive_id_type: str = "chat_id",
+) -> None:
+    if not receive_id or not content_lines:
+        return
+    token = await get_app_access_token()
+    timeout = max(_env_int("QUOTE_FEISHU_BOT_TIMEOUT_SECONDS", 30), 5)
+    url = f"{feishu_openapi_base_url()}/open-apis/im/v1/messages"
+    payload = {
+        "receive_id": receive_id,
+        "msg_type": "post",
+        "content": json.dumps(
+            {
+                "zh_cn": {
+                    "title": title,
+                    "content": content_lines,
+                }
+            },
+            ensure_ascii=False,
+        ),
+    }
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        response = await client.post(
+            url,
+            params={"receive_id_type": receive_id_type},
+            headers={"Authorization": f"Bearer {token}"},
+            json=payload,
+        )
+        response.raise_for_status()
+        data = response.json()
+        code = data.get("code", 0)
+        if code not in {0, "0", None}:
+            raise RuntimeError(str(data.get("msg") or data.get("message") or "Feishu send post message failed."))
+
+
 async def send_feishu_file(receive_id: str, path: Path, receive_id_type: str = "chat_id") -> None:
     if not receive_id:
         return
@@ -586,18 +625,32 @@ async def send_feishu_report_messages(
     receive_id_type: str = "chat_id",
 ) -> None:
     title = f"报价任务 {feishu_job_code(job_id)} 已完成。"
-    chunks = split_feishu_text(compact_report_excerpt(report_text, feishu_report_max_chars()))
+    excerpt = compact_report_excerpt(report_text, feishu_report_max_chars())
+    lines = markdown_to_feishu_post_lines(excerpt)
+    chunks = split_feishu_post_lines(
+        lines,
+        max_chars=feishu_post_max_chars(),
+        max_lines=feishu_post_max_lines(),
+    )
     if not chunks:
         await send_feishu_text(receive_id, f"{title}\n\n报告已生成，但正文为空。", receive_id_type)
         return
 
-    await send_feishu_text(receive_id, f"{title}\n\n{chunks[0]}", receive_id_type)
-    for index, chunk in enumerate(chunks[1:], start=2):
-        await send_feishu_text(receive_id, f"报告续篇 {index}/{len(chunks)}：\n\n{chunk}", receive_id_type)
+    for index, chunk in enumerate(chunks, start=1):
+        message_title = title if len(chunks) == 1 else f"{title}（{index}/{len(chunks)}）"
+        await send_feishu_post(receive_id, message_title, chunk, receive_id_type)
 
 
 def feishu_report_max_chars() -> int:
-    return max(_env_int("QUOTE_FEISHU_BOT_REPORT_MAX_CHARS", 6000), 1000)
+    return max(_env_int("QUOTE_FEISHU_BOT_REPORT_MAX_CHARS", 24000), 1000)
+
+
+def feishu_post_max_chars() -> int:
+    return max(_env_int("QUOTE_FEISHU_BOT_POST_MAX_CHARS", 5200), 1000)
+
+
+def feishu_post_max_lines() -> int:
+    return max(_env_int("QUOTE_FEISHU_BOT_POST_MAX_LINES", 90), 20)
 
 
 def split_feishu_text(text: str, chunk_size: int | None = None) -> list[str]:
@@ -626,7 +679,7 @@ def feishu_job_code(job_id: str, created_at: str = "") -> str:
 
 
 def quote_created_text(job_id: str, created_at: str = "") -> str:
-    return f"已创建任务 {feishu_job_code(job_id, created_at)}，正在识图报价。完成后我会把报告和 Excel 发到当前飞书会话。"
+    return f"已创建任务 {feishu_job_code(job_id, created_at)}，正在识图报价。完成后我会把报告正文、PDF 和 Excel 发到当前飞书会话。"
 
 
 def quote_failed_text(job_id: str, error: str = "") -> str:
