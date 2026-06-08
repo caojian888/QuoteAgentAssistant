@@ -8,6 +8,7 @@ import os
 import re
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -496,13 +497,136 @@ async def send_feishu_text(receive_id: str, text: str, receive_id_type: str = "c
             raise RuntimeError(str(data.get("msg") or data.get("message") or "Feishu send message failed."))
 
 
+async def send_feishu_file(receive_id: str, path: Path, receive_id_type: str = "chat_id") -> None:
+    if not receive_id:
+        return
+    file_key = await upload_feishu_file(path)
+    await send_feishu_file_message(receive_id, file_key, receive_id_type=receive_id_type)
+
+
+async def upload_feishu_file(path: Path) -> str:
+    if not path.exists() or not path.is_file():
+        raise RuntimeError(f"Feishu upload file not found: {path}")
+
+    token = await get_app_access_token()
+    timeout = max(_env_int("QUOTE_FEISHU_BOT_TIMEOUT_SECONDS", 30), 5)
+    url = f"{feishu_openapi_base_url()}/open-apis/im/v1/files"
+    size = path.stat().st_size
+    if size <= 0:
+        raise RuntimeError("Feishu upload file is empty.")
+    if size > feishu_bot_max_file_bytes():
+        raise RuntimeError(f"文件 {path.name} 超过 {feishu_bot_max_file_bytes() // 1024 // 1024} MB 限制。")
+
+    data = {
+        "file_type": feishu_file_type(path),
+        "file_name": path.name,
+    }
+    with path.open("rb") as file_obj:
+        files = {"file": (path.name, file_obj, "application/octet-stream")}
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.post(
+                url,
+                headers={"Authorization": f"Bearer {token}"},
+                data=data,
+                files=files,
+            )
+    response.raise_for_status()
+    payload = response.json()
+    code = payload.get("code", 0)
+    if code not in {0, "0", None}:
+        raise RuntimeError(str(payload.get("msg") or payload.get("message") or "Feishu upload file failed."))
+    file_key = ((payload.get("data") or {}).get("file_key") or payload.get("file_key") or "").strip()
+    if not file_key:
+        raise RuntimeError("Feishu upload did not return file_key.")
+    return file_key
+
+
+def feishu_file_type(path: Path) -> str:
+    suffix = path.suffix.lower()
+    if suffix in {".xls", ".xlsx"}:
+        return "xls"
+    if suffix == ".pdf":
+        return "pdf"
+    if suffix in {".doc", ".docx"}:
+        return "doc"
+    if suffix in {".ppt", ".pptx"}:
+        return "ppt"
+    return "stream"
+
+
+async def send_feishu_file_message(receive_id: str, file_key: str, receive_id_type: str = "chat_id") -> None:
+    if not receive_id or not file_key:
+        return
+    token = await get_app_access_token()
+    timeout = max(_env_int("QUOTE_FEISHU_BOT_TIMEOUT_SECONDS", 30), 5)
+    url = f"{feishu_openapi_base_url()}/open-apis/im/v1/messages"
+    payload = {
+        "receive_id": receive_id,
+        "msg_type": "file",
+        "content": json.dumps({"file_key": file_key}, ensure_ascii=False),
+    }
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        response = await client.post(
+            url,
+            params={"receive_id_type": receive_id_type},
+            headers={"Authorization": f"Bearer {token}"},
+            json=payload,
+        )
+        response.raise_for_status()
+        data = response.json()
+        code = data.get("code", 0)
+        if code not in {0, "0", None}:
+            raise RuntimeError(str(data.get("msg") or data.get("message") or "Feishu send file message failed."))
+
+
+async def send_feishu_report_messages(
+    receive_id: str,
+    job_id: str,
+    report_text: str,
+    receive_id_type: str = "chat_id",
+) -> None:
+    title = f"报价任务 {feishu_job_code(job_id)} 已完成。"
+    chunks = split_feishu_text(compact_report_excerpt(report_text, feishu_report_max_chars()))
+    if not chunks:
+        await send_feishu_text(receive_id, f"{title}\n\n报告已生成，但正文为空。", receive_id_type)
+        return
+
+    await send_feishu_text(receive_id, f"{title}\n\n{chunks[0]}", receive_id_type)
+    for index, chunk in enumerate(chunks[1:], start=2):
+        await send_feishu_text(receive_id, f"报告续篇 {index}/{len(chunks)}：\n\n{chunk}", receive_id_type)
+
+
+def feishu_report_max_chars() -> int:
+    return max(_env_int("QUOTE_FEISHU_BOT_REPORT_MAX_CHARS", 6000), 1000)
+
+
+def split_feishu_text(text: str, chunk_size: int | None = None) -> list[str]:
+    chunk_size = chunk_size or max(_env_int("QUOTE_FEISHU_BOT_MESSAGE_CHARS", 1800), 500)
+    cleaned = (text or "").strip()
+    if not cleaned:
+        return []
+    chunks: list[str] = []
+    while cleaned:
+        if len(cleaned) <= chunk_size:
+            chunks.append(cleaned)
+            break
+        cut = cleaned.rfind("\n\n", 0, chunk_size)
+        if cut < chunk_size // 2:
+            cut = cleaned.rfind("\n", 0, chunk_size)
+        if cut < chunk_size // 2:
+            cut = chunk_size
+        chunks.append(cleaned[:cut].strip())
+        cleaned = cleaned[cut:].strip()
+    return [item for item in chunks if item]
+
+
 def feishu_job_code(job_id: str, created_at: str = "") -> str:
     date_text = time.strftime("%Y%m%d")
     return f"QA-{date_text}-{job_id[:8]}"
 
 
 def quote_created_text(job_id: str, created_at: str = "") -> str:
-    return f"已创建任务 {feishu_job_code(job_id, created_at)}，正在识图报价。完成后我会把摘要和链接发回来。"
+    return f"已创建任务 {feishu_job_code(job_id, created_at)}，正在识图报价。完成后我会把报告和 Excel 发到当前飞书会话。"
 
 
 def quote_failed_text(job_id: str, error: str = "") -> str:
@@ -523,14 +647,12 @@ def quote_completed_text(
         return quote_failed_text(job_id, error)
 
     excerpt = compact_report_excerpt(report_text, 1200)
-    report_url = f"{base_url.rstrip('/')}/jobs/{job_id}/report"
-    excel_line = f"\n下载 Excel：{base_url.rstrip('/')}/jobs/{job_id}/excel" if has_excel else ""
-    return (
-        f"报价任务 {feishu_job_code(job_id)} 已完成。\n\n"
-        f"{excerpt}\n\n"
-        f"查看完整报告：{report_url}"
-        f"{excel_line}"
-    )
+    fallback = ""
+    if base_url:
+        report_url = f"{base_url.rstrip('/')}/jobs/{job_id}/report"
+        excel_line = f"\nExcel 备用链接：{base_url.rstrip('/')}/jobs/{job_id}/excel" if has_excel else ""
+        fallback = f"\n\n完整报告备用链接：{report_url}{excel_line}"
+    return f"报价任务 {feishu_job_code(job_id)} 已完成。\n\n{excerpt}{fallback}"
 
 
 def compact_report_excerpt(text: str, max_chars: int = 1200) -> str:

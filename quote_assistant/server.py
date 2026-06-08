@@ -68,6 +68,8 @@ from .feishu_bot import (
     is_duplicate_feishu_event,
     quote_completed_text,
     quote_created_text,
+    send_feishu_file,
+    send_feishu_report_messages,
     send_feishu_text,
 )
 from .model_config import build_model_config
@@ -1132,15 +1134,43 @@ async def run_job_langgraph_with_feishu_notification(
             report_text = ""
             if latest.report_path and Path(latest.report_path).exists():
                 report_text = Path(latest.report_path).read_text(encoding="utf-8", errors="replace")
-            text = quote_completed_text(
-                latest.job_id,
-                report_text,
-                base_url or os.getenv("QUOTE_PUBLIC_BASE_URL", "").strip() or "",
-                has_excel=excel_path(latest.job_id).exists(),
-                status=latest.status,
-                error=latest.error or latest.review_error or "",
-            )
-            await send_feishu_text(receive_id, text, receive_id_type=receive_id_type)
+            if latest.status == "failed":
+                text = quote_completed_text(
+                    latest.job_id,
+                    report_text,
+                    "",
+                    status=latest.status,
+                    error=latest.error or latest.review_error or "",
+                )
+                await send_feishu_text(receive_id, text, receive_id_type=receive_id_type)
+                return
+
+            await send_feishu_report_messages(receive_id, latest.job_id, report_text, receive_id_type)
+            workbook_path = excel_path(latest.job_id)
+            if workbook_path.exists():
+                try:
+                    await send_feishu_file(receive_id, workbook_path, receive_id_type=receive_id_type)
+                except Exception:
+                    logger.exception("feishu excel file delivery failed job_id=%s", record.job_id)
+                    fallback_base_url = base_url or os.getenv("QUOTE_PUBLIC_BASE_URL", "").strip() or ""
+                    if fallback_base_url:
+                        await send_feishu_text(
+                            receive_id,
+                            f"Excel 文件发送到飞书失败，可先用备用链接下载：{fallback_base_url.rstrip('/')}/jobs/{latest.job_id}/excel",
+                            receive_id_type=receive_id_type,
+                        )
+                    else:
+                        await send_feishu_text(
+                            receive_id,
+                            "Excel 文件发送到飞书失败，请联系管理员检查飞书文件上传权限。",
+                            receive_id_type=receive_id_type,
+                        )
+            else:
+                await send_feishu_text(
+                    receive_id,
+                    "本次任务未生成 Excel 文件，报告内容已发送在上方。",
+                    receive_id_type=receive_id_type,
+                )
         except Exception:
             logger.exception("feishu quote completion notification failed job_id=%s", record.job_id)
 

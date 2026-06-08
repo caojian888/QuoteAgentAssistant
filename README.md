@@ -141,7 +141,7 @@ POST https://your-domain.example/api/feishu/events
 @报价助手 帮我报价
 ```
 
-机器人会先暂存本轮会话中的文件，收到“帮我报价”后才创建报价任务。任务完成后，机器人会发回报告摘要、完整报告链接和 Excel 下载链接。
+机器人会先暂存本轮会话中的文件，收到“帮我报价”后才创建报价任务。任务完成后，机器人会直接在飞书会话中发送报告内容，并把生成的 Excel 成本表作为飞书文件发回。
 
 关键环境变量：
 
@@ -156,6 +156,8 @@ QUOTE_PUBLIC_BASE_URL=https://your-domain.example
 
 生产环境启用 `QUOTE_FEISHU_BOT_ENABLED=true` 时，`QUOTE_FEISHU_EVENT_VERIFICATION_TOKEN` 或
 `QUOTE_FEISHU_EVENT_ENCRYPT_KEY` 至少配置一个；推荐两个都配置。
+
+飞书权限除了接收消息和发送消息外，还需要允许应用上传/发送文件，否则 Excel 文件无法直接发回飞书。
 
 ## 注意事项
 
