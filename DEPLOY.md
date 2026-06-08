@@ -61,6 +61,11 @@ QUOTE_COOKIE_SECURE=true
 
 QUOTE_PUBLIC_BASE_URL=https://cost.inferhub.tech
 QUOTE_FEISHU_LOGIN_ENABLED=false
+
+# 飞书机器人事件入口，先保持 false；合并部署后再在服务器 env 中启用。
+QUOTE_FEISHU_BOT_ENABLED=false
+QUOTE_FEISHU_EVENT_VERIFICATION_TOKEN=
+QUOTE_FEISHU_EVENT_ENCRYPT_KEY=
 ```
 
 ## 迁移现有 .env 和 data
@@ -119,6 +124,43 @@ git pull
 python -m pip install -r requirements.txt
 systemctl restart quote-agent-assistant
 ```
+
+## 飞书机器人接入
+
+本项目支持把报价流程接入飞书开放平台应用机器人。推荐先通过 GitHub 合并，再由 Jenkins 部署到服务器；不要直接在服务器手改代码。
+
+飞书后台配置：
+
+```text
+1. 开启应用机器人能力。
+2. 在事件订阅中配置请求地址：
+   https://cost.inferhub.tech/api/feishu/events
+3. 订阅接收消息事件 im.message.receive_v1。
+4. 添加读取消息资源、发送消息等机器人所需权限，并发布应用版本给企业管理员审批。
+```
+
+服务器环境变量：
+
+```text
+QUOTE_FEISHU_BOT_ENABLED=true
+QUOTE_FEISHU_APP_ID=cli_xxx
+QUOTE_FEISHU_APP_SECRET=xxx
+QUOTE_FEISHU_EVENT_VERIFICATION_TOKEN=xxx
+QUOTE_FEISHU_EVENT_ENCRYPT_KEY=xxx
+QUOTE_PUBLIC_BASE_URL=https://cost.inferhub.tech
+```
+
+启用机器人时，`QUOTE_FEISHU_EVENT_VERIFICATION_TOKEN` 或 `QUOTE_FEISHU_EVENT_ENCRYPT_KEY` 至少配置一个；生产环境推荐两个都配置。
+
+员工使用流程：
+
+```text
+@报价助手 开启报价
+直接上传 PDF / 图片 / 图纸文件
+@报价助手 帮我报价
+```
+
+文件上传消息不会立即创建报价任务，只会加入当前会话；收到“帮我报价”后才会创建任务并回传摘要、完整报告链接和 Excel 下载链接。
 
 ## 验证
 

@@ -53,6 +53,23 @@ from .feishu_auth import (
     feishu_login_enabled,
     fetch_feishu_user_profile,
 )
+from .feishu_bot import (
+    FeishuBotAction,
+    FeishuDownloadedFile,
+    build_feishu_bot_action,
+    decode_feishu_event,
+    download_feishu_attachments,
+    ensure_feishu_event_user,
+    feishu_bot_audit_enabled,
+    feishu_bot_config_status,
+    feishu_bot_enabled,
+    feishu_bot_max_review_rounds,
+    feishu_challenge_response,
+    is_duplicate_feishu_event,
+    quote_completed_text,
+    quote_created_text,
+    send_feishu_text,
+)
 from .model_config import build_model_config
 from .office_events import bind_office_event_context, log_office_event, read_office_events, reset_office_event_context
 from .office_state import build_office_state
@@ -707,6 +724,31 @@ async def save_uploads(job_id: str, uploads: list[UploadFile] | None) -> list[Sa
     return saved
 
 
+def save_downloaded_files(job_id: str, downloads: list[FeishuDownloadedFile]) -> list[SavedUpload]:
+    input_dir = job_dir(job_id) / "input"
+    input_dir.mkdir(parents=True, exist_ok=True)
+    saved: list[SavedUpload] = []
+
+    for index, item in enumerate(downloads):
+        if not item.file_name or not item.content:
+            continue
+        original_name = Path(item.file_name).name
+        destination = input_dir / f"{index + 1:02d}-{safe_name(original_name)}"
+        destination.write_bytes(item.content)
+        saved.append(
+            SavedUpload(
+                path=destination,
+                original_name=original_name,
+                stored_name=destination.name,
+                mime_type=guess_mime_type(destination, item.mime_type),
+                size_bytes=len(item.content),
+                sha256=hashlib.sha256(item.content).hexdigest(),
+            )
+        )
+
+    return saved
+
+
 async def generate_report(
     prompt: str,
     files: list[Path],
@@ -1070,6 +1112,39 @@ async def run_job_langgraph(
         reset_office_event_context(event_token)
 
 
+async def run_job_langgraph_with_feishu_notification(
+    record: JobRecord,
+    files: list[Path],
+    max_review_rounds: int,
+    audit: bool,
+    work_model: str | None,
+    vision_model: str | None,
+    review_model: str | None,
+    receive_id: str,
+    receive_id_type: str = "chat_id",
+    base_url: str = "",
+) -> None:
+    try:
+        await run_job_langgraph(record, files, max_review_rounds, audit, work_model, vision_model, review_model)
+    finally:
+        try:
+            latest = read_status(record.job_id)
+            report_text = ""
+            if latest.report_path and Path(latest.report_path).exists():
+                report_text = Path(latest.report_path).read_text(encoding="utf-8", errors="replace")
+            text = quote_completed_text(
+                latest.job_id,
+                report_text,
+                base_url or os.getenv("QUOTE_PUBLIC_BASE_URL", "").strip() or "",
+                has_excel=excel_path(latest.job_id).exists(),
+                status=latest.status,
+                error=latest.error or latest.review_error or "",
+            )
+            await send_feishu_text(receive_id, text, receive_id_type=receive_id_type)
+        except Exception:
+            logger.exception("feishu quote completion notification failed job_id=%s", record.job_id)
+
+
 async def run_job(
     record: JobRecord,
     files: list[Path],
@@ -1186,6 +1261,84 @@ async def run_job(
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/api/feishu/bot/status")
+async def feishu_bot_status() -> dict:
+    return feishu_bot_config_status()
+
+
+async def handle_feishu_create_job(action: FeishuBotAction, base_url: str) -> None:
+    try:
+        downloads = await download_feishu_attachments(action.attachments or [])
+        if not downloads:
+            await send_feishu_text(action.receive_id, "没有找到可报价的图纸文件，请重新上传。", action.receive_id_type)
+            return
+
+        user_id = ensure_feishu_event_user(action.sender or {})
+        job_id = uuid.uuid4().hex
+        saved_uploads = save_downloaded_files(job_id, downloads)
+        saved_files = saved_upload_paths(saved_uploads)
+        record = JobRecord(
+            job_id=job_id,
+            status="queued",
+            created_at=now_iso(),
+            updated_at=now_iso(),
+            prompt=action.prompt,
+            user_id=user_id,
+        )
+        write_status(record)
+        try:
+            upsert_job(record, saved_upload_file_names(saved_uploads))
+            replace_job_files(record.job_id, saved_upload_records(saved_uploads))
+        except Exception:
+            logger.exception("feishu quote database initial job sync failed job_id=%s", record.job_id)
+
+        await send_feishu_text(action.receive_id, quote_created_text(job_id, record.created_at), action.receive_id_type)
+        await run_job_langgraph_with_feishu_notification(
+            record,
+            saved_files,
+            feishu_bot_max_review_rounds(),
+            feishu_bot_audit_enabled(),
+            None,
+            None,
+            None,
+            action.receive_id,
+            action.receive_id_type,
+            base_url,
+        )
+    except Exception as exc:
+        logger.exception("feishu quote job creation failed")
+        try:
+            await send_feishu_text(action.receive_id, f"创建报价任务失败：{exc}", action.receive_id_type)
+        except Exception:
+            logger.exception("feishu quote failure notification failed")
+
+
+@app.post("/api/feishu/events")
+async def feishu_events(request: Request) -> dict:
+    if not feishu_bot_enabled():
+        raise HTTPException(status_code=404, detail="Feishu bot is not enabled.")
+
+    config_status = feishu_bot_config_status()
+    if not config_status.get("event_security_configured"):
+        raise HTTPException(status_code=503, detail="Feishu bot event security is not configured.")
+
+    raw_body = await request.body()
+    payload = decode_feishu_event(raw_body, dict(request.headers))
+    challenge = feishu_challenge_response(payload)
+    if challenge:
+        return challenge
+
+    if is_duplicate_feishu_event(payload):
+        return {"ok": True, "duplicate": True}
+
+    action = build_feishu_bot_action(payload)
+    if action.kind == "reply":
+        await send_feishu_text(action.receive_id, action.reply_text, action.receive_id_type)
+    elif action.kind == "create_job":
+        asyncio.create_task(handle_feishu_create_job(action, public_base_url(request)))
+    return {"ok": True, "action": action.kind}
 
 
 @app.get("/static/{file_path:path}")
@@ -1664,6 +1817,20 @@ async def logout(request: Request) -> RedirectResponse:
 @app.get("/office")
 async def office_alias() -> RedirectResponse:
     return RedirectResponse("/agent-office", status_code=303)
+
+
+@app.get("/jobs/{job_id}/report")
+async def job_report_link(request: Request, job_id: str) -> RedirectResponse:
+    if auth_required() and not current_auth(request):
+        return login_redirect(f"/jobs/{job_id}/report")
+    return RedirectResponse(f"/api/jobs/{job_id}/report", status_code=303)
+
+
+@app.get("/jobs/{job_id}/excel")
+async def job_excel_link(request: Request, job_id: str) -> RedirectResponse:
+    if auth_required() and not current_auth(request):
+        return login_redirect(f"/jobs/{job_id}/excel")
+    return RedirectResponse(f"/api/jobs/{job_id}/excel", status_code=303)
 
 
 @app.get("/agent-office", response_class=HTMLResponse)

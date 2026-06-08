@@ -125,6 +125,38 @@ GET /api/jobs/{job_id}/excel
 GET /api/jobs/{job_id}/assets
 ```
 
+## 飞书机器人
+
+可复用同一个飞书开放平台应用的 `App ID` / `App Secret`，在后台开启机器人能力并配置事件订阅：
+
+```text
+POST https://your-domain.example/api/feishu/events
+```
+
+启用后，企业员工按以下流程使用：
+
+```text
+@报价助手 开启报价
+直接上传 PDF / 图片 / 图纸文件
+@报价助手 帮我报价
+```
+
+机器人会先暂存本轮会话中的文件，收到“帮我报价”后才创建报价任务。任务完成后，机器人会发回报告摘要、完整报告链接和 Excel 下载链接。
+
+关键环境变量：
+
+```text
+QUOTE_FEISHU_BOT_ENABLED=true
+QUOTE_FEISHU_APP_ID=cli_xxx
+QUOTE_FEISHU_APP_SECRET=xxx
+QUOTE_FEISHU_EVENT_VERIFICATION_TOKEN=xxx
+QUOTE_FEISHU_EVENT_ENCRYPT_KEY=xxx
+QUOTE_PUBLIC_BASE_URL=https://your-domain.example
+```
+
+生产环境启用 `QUOTE_FEISHU_BOT_ENABLED=true` 时，`QUOTE_FEISHU_EVENT_VERIFICATION_TOKEN` 或
+`QUOTE_FEISHU_EVENT_ENCRYPT_KEY` 至少配置一个；推荐两个都配置。
+
 ## 注意事项
 
 - 不要提交 `.env`、`data`、`inbox`、`outbox`、上传的图纸、生成的 Excel 文件，
