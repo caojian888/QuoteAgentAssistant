@@ -271,6 +271,10 @@ def excel_path(job_id: str) -> Path:
     return job_dir(job_id) / "cost_table.xlsx"
 
 
+def excel_candidate_path(job_id: str) -> Path:
+    return job_dir(job_id) / "cost_table.candidate.xlsx"
+
+
 def excel_payload_path(job_id: str) -> Path:
     return job_dir(job_id) / "cost_table_payload.json"
 
@@ -1176,13 +1180,25 @@ async def run_job_langgraph_with_feishu_notification(
                             receive_id_type=receive_id_type,
                         )
             workbook_path = excel_path(latest.job_id)
+            workbook_is_candidate = False
+            if not workbook_path.exists():
+                candidate_path = excel_candidate_path(latest.job_id)
+                if candidate_path.exists():
+                    workbook_path = candidate_path
+                    workbook_is_candidate = True
             if workbook_path.exists():
                 try:
+                    if workbook_is_candidate:
+                        await send_feishu_text(
+                            receive_id,
+                            "Excel 审核未通过正式报价标准，我会把候选成本表作为待确认版发出，请以报告中的待确认项为准。",
+                            receive_id_type=receive_id_type,
+                        )
                     await send_feishu_file(receive_id, workbook_path, receive_id_type=receive_id_type)
                 except Exception:
                     logger.exception("feishu excel file delivery failed job_id=%s", record.job_id)
                     fallback_base_url = base_url or os.getenv("QUOTE_PUBLIC_BASE_URL", "").strip() or ""
-                    if fallback_base_url:
+                    if fallback_base_url and not workbook_is_candidate:
                         await send_feishu_text(
                             receive_id,
                             f"Excel 文件发送到飞书失败，可先用备用链接下载：{fallback_base_url.rstrip('/')}/jobs/{latest.job_id}/excel",
@@ -1197,7 +1213,7 @@ async def run_job_langgraph_with_feishu_notification(
             else:
                 await send_feishu_text(
                     receive_id,
-                    "本次任务未生成 Excel 文件，报告内容已发送在上方。",
+                    "本次任务未生成 Excel 文件，报告正文和 PDF 已发送在上方。",
                     receive_id_type=receive_id_type,
                 )
         except Exception:
