@@ -18,7 +18,7 @@ from .responses_vision import create_vision_summary
 from .responses_text import create_text_response
 
 
-TRANSIENT_STATUS_CODES = {408, 409, 429, 500, 502, 503, 504}
+TRANSIENT_STATUS_CODES = {408, 409, 429, 500, 502, 503, 504, 524}
 logger = logging.getLogger("uvicorn.error")
 
 REVIEW_SKILL_BLOCKS = "\n\n".join(
@@ -96,8 +96,21 @@ def is_retryable_model_error(exc: Exception) -> bool:
     if status_code in TRANSIENT_STATUS_CODES:
         return True
 
-    text = str(exc).lower()
-    return "retryable" in text or "bad gateway" in text or "temporarily unavailable" in text
+    text = f"{exc.__class__.__name__}: {exc}".lower()
+    return any(
+        marker in text
+        for marker in (
+            "retryable",
+            "bad gateway",
+            "temporarily unavailable",
+            "gateway timeout",
+            "a timeout occurred",
+            "error 524",
+            "responses api error 524",
+            "readtimeout",
+            "timeout",
+        )
+    )
 
 
 def should_fallback_to_chat_vision(exc: Exception) -> bool:

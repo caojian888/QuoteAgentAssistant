@@ -405,6 +405,14 @@ def _clip(text: str, max_chars: int) -> str:
     return f"{text[:max_chars]}\n...[truncated {len(text) - max_chars} chars]"
 
 
+def _compact_error_message(exc: Exception) -> str:
+    text = re.sub(r"<[^>]+>", " ", str(exc))
+    text = re.sub(r"\s+", " ", text).strip()
+    if not text:
+        text = exc.__class__.__name__
+    return text[:240] + ("..." if len(text) > 240 else "")
+
+
 def build_excel_audit_prompt(
     *,
     user_prompt: str,
@@ -622,15 +630,18 @@ async def audit_excel_output(
         )
     except Exception as exc:
         logger.exception("quote excel audit agent failed")
+        rule_verdict = _normalize_verdict(rule_audit.get("verdict"), default="fail")
         agent_audit = {
-            "verdict": "fail",
-            "quality_level": "C",
-            "confidence": "low",
-            "issues": [f"Excel 审核 Agent 调用失败：{exc}"],
+            "verdict": rule_verdict,
+            "quality_level": _normalize_quality(rule_audit.get("quality_level"), rule_verdict),
+            "confidence": _normalize_confidence(rule_audit.get("confidence")),
+            "issues": [],
             "missing_fields": [],
-            "warnings": [],
-            "repair_prompt": "",
-            "can_auto_retry": False,
+            "warnings": [
+                f"Excel 审核 Agent 调用失败，已按规则审核结果降级处理：{_compact_error_message(exc)}"
+            ],
+            "repair_prompt": str(rule_audit.get("repair_prompt") or ""),
+            "can_auto_retry": bool(rule_audit.get("can_auto_retry")),
         }
         raw = str(exc)
 
