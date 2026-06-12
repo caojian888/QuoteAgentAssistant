@@ -85,11 +85,17 @@ DATA_DIR = runtime_data_dir()
 JOBS_DIR = DATA_DIR / "jobs"
 STATIC_DIR = PROJECT_ROOT / "static"
 OFFICE_PAGE_PATH = PROJECT_ROOT / "templates" / "agent-office.html"
+PROTOTYPE_PAGE_PATH = PROJECT_ROOT / "templates" / "prototype.html"
 OFFICE_ASSET_PATHS = (
     OFFICE_PAGE_PATH,
     STATIC_DIR / "agent-office" / "styles.css",
     STATIC_DIR / "agent-office" / "agent-office.config.js",
     STATIC_DIR / "agent-office" / "script.js",
+)
+PROTOTYPE_ASSET_PATHS = (
+    PROTOTYPE_PAGE_PATH,
+    STATIC_DIR / "prototype" / "styles.css",
+    STATIC_DIR / "prototype" / "script.js",
 )
 FEISHU_STATE_COOKIE_NAME = "quote_feishu_oauth_state"
 FEISHU_NEXT_COOKIE_NAME = "quote_feishu_oauth_next"
@@ -248,6 +254,16 @@ def safe_name(file_name: str | None) -> str:
 def office_asset_version() -> str:
     latest = 0
     for path in OFFICE_ASSET_PATHS:
+        try:
+            latest = max(latest, int(path.stat().st_mtime_ns))
+        except OSError:
+            continue
+    return str(latest or int(datetime.now(timezone.utc).timestamp()))
+
+
+def prototype_asset_version() -> str:
+    latest = 0
+    for path in PROTOTYPE_ASSET_PATHS:
         try:
             latest = max(latest, int(path.stat().st_mtime_ns))
         except OSError:
@@ -1918,6 +1934,17 @@ async def agent_office(request: Request):
     html_text = OFFICE_PAGE_PATH.read_text(encoding="utf-8").replace(
         "__OFFICE_ASSET_VERSION__",
         asset_version,
+    )
+    return HTMLResponse(html_text)
+
+
+@app.get("/prototype", response_class=HTMLResponse)
+async def prototype() -> HTMLResponse:
+    if not PROTOTYPE_PAGE_PATH.exists() or not PROTOTYPE_PAGE_PATH.is_file():
+        raise HTTPException(status_code=404, detail="Prototype page not found.")
+    html_text = PROTOTYPE_PAGE_PATH.read_text(encoding="utf-8").replace(
+        "__PROTOTYPE_ASSET_VERSION__",
+        prototype_asset_version(),
     )
     return HTMLResponse(html_text)
 

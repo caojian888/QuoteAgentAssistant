@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quote Flow Prototype</title>
+  <link rel="stylesheet" href="/static/prototype/styles.css?v=__PROTOTYPE_ASSET_VERSION__">
+</head>
+<body>
+  <main class="prototype-shell">
+    <section class="hero-panel">
+      <div class="hero-copy">
+        <p class="eyebrow">AI Quote Prototype</p>
+        <h1>从图纸进入，到报价交付的可视化工作台</h1>
+        <p class="hero-summary">
+          这是一个轻量原型，用来演示上传图纸、Agent 协同拆解、审核回路和报价结果落地的前台体验。
+        </p>
+
+        <div class="hero-actions">
+          <button id="start-demo" class="primary-button" type="button">开始演示</button>
+          <button id="next-step" class="ghost-button" type="button">下一步</button>
+        </div>
+
+        <div class="scenario-strip" role="tablist" aria-label="原型场景">
+          <button class="scenario-chip active" type="button" data-scenario="busbar">铜排报价</button>
+          <button class="scenario-chip" type="button" data-scenario="sheet">钣金报价</button>
+          <button class="scenario-chip" type="button" data-scenario="bolt">螺栓报价</button>
+        </div>
+      </div>
+
+      <aside class="hero-glance">
+        <div class="glance-card">
+          <span class="glance-label">当前状态</span>
+          <strong id="hero-status">待命中</strong>
+          <p id="hero-subtitle">选择场景后，模拟完整报价链路。</p>
+        </div>
+        <div class="glance-grid">
+          <article class="metric-card">
+            <span>识图置信度</span>
+            <strong id="metric-confidence">92%</strong>
+          </article>
+          <article class="metric-card">
+            <span>Agent 数量</span>
+            <strong id="metric-agents">6</strong>
+          </article>
+          <article class="metric-card">
+            <span>预计时长</span>
+            <strong id="metric-time">38s</strong>
+          </article>
+          <article class="metric-card">
+            <span>输出物</span>
+            <strong id="metric-output">Excel + 报告</strong>
+          </article>
+        </div>
+      </aside>
+    </section>
+
+    <section class="workspace-grid">
+      <section class="panel upload-panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">01 Input</p>
+            <h2>图纸入口</h2>
+          </div>
+          <span class="status-pill">Prototype</span>
+        </div>
+
+        <div class="upload-dropzone">
+          <div class="upload-badge">PDF</div>
+          <div>
+            <strong id="upload-title">TMY-100x10 铜排总成图</strong>
+            <p id="upload-meta">3 页图纸，带孔位与折弯信息，等待识别。</p>
+          </div>
+        </div>
+
+        <div class="field-stack">
+          <label>客户需求摘要</label>
+          <div class="mock-field">
+            识别图纸物料类型，输出 BOM、主要工序、风险提示，并生成未税报价建议。
+          </div>
+        </div>
+
+        <div class="field-stack">
+          <label>自动检查项</label>
+          <div class="check-list">
+            <span>材质映射</span>
+            <span>展开长度</span>
+            <span>孔径核验</span>
+            <span>废料抵扣</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel pipeline-panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">02 Flow</p>
+            <h2>Agent 协同链路</h2>
+          </div>
+          <span id="pipeline-note" class="panel-note">尚未启动</span>
+        </div>
+
+        <div class="pipeline-progress">
+          <span id="progress-bar"></span>
+        </div>
+
+        <div id="pipeline-steps" class="pipeline-steps">
+          <article class="step-card active" data-step="0">
+            <span class="step-index">01</span>
+            <div>
+              <strong>Vision Agent</strong>
+              <p>识别图纸品类、材料和关键尺寸。</p>
+            </div>
+          </article>
+          <article class="step-card" data-step="1">
+            <span class="step-index">02</span>
+            <div>
+              <strong>Routing Agent</strong>
+              <p>选择铜排 / 钣金 / 螺栓成本技能路径。</p>
+            </div>
+          </article>
+          <article class="step-card" data-step="2">
+            <span class="step-index">03</span>
+            <div>
+              <strong>Costing Agent</strong>
+              <p>展开材料、工序、损耗与工时成本。</p>
+            </div>
+          </article>
+          <article class="step-card" data-step="3">
+            <span class="step-index">04</span>
+            <div>
+              <strong>Review Agent</strong>
+              <p>查漏项、异常单价和证据完整性。</p>
+            </div>
+          </article>
+          <article class="step-card" data-step="4">
+            <span class="step-index">05</span>
+            <div>
+              <strong>Excel Output Agent</strong>
+              <p>输出报价表、说明和交付附件。</p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel live-panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">03 Output</p>
+            <h2>报价结果预览</h2>
+          </div>
+          <span id="result-tag" class="status-pill accent">Draft</span>
+        </div>
+
+        <div class="quote-hero">
+          <div>
+            <span class="quote-label">建议未税单价</span>
+            <strong id="quote-price">¥ 428.60</strong>
+          </div>
+          <div class="quote-chip">置信度 <span id="quote-score">A-</span></div>
+        </div>
+
+        <div class="result-grid">
+          <article>
+            <span>材料成本</span>
+            <strong id="result-material">¥ 248.00</strong>
+          </article>
+          <article>
+            <span>加工成本</span>
+            <strong id="result-process">¥ 126.40</strong>
+          </article>
+          <article>
+            <span>附加费用</span>
+            <strong id="result-extra">¥ 54.20</strong>
+          </article>
+          <article>
+            <span>风险等级</span>
+            <strong id="result-risk">低</strong>
+          </article>
+        </div>
+
+        <div class="result-notes">
+          <div>
+            <label>系统摘要</label>
+            <p id="result-summary">
+              已识别为铜排件，材料与孔位较完整，建议进入审核后直接生成 Excel。
+            </p>
+          </div>
+          <div>
+            <label>待确认项</label>
+            <ul id="pending-list">
+              <li>表面处理是否包含镀锡</li>
+              <li>客户是否需要包装费用单列</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <section class="panel stream-panel">
+      <div class="panel-header">
+        <div>
+          <p class="eyebrow">Live Feed</p>
+          <h2>运行事件流</h2>
+        </div>
+        <span id="stream-clock" class="panel-note">00:00</span>
+      </div>
+
+      <div id="stream-list" class="stream-list">
+        <article class="stream-item">
+          <span class="stream-time">00:00</span>
+          <div>
+            <strong>系统待命</strong>
+            <p>原型已加载，点击“开始演示”查看 Agent 接力过程。</p>
+          </div>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/prototype/script.js?v=__PROTOTYPE_ASSET_VERSION__"></script>
+</body>
+</html>
